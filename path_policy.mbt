@@ -4,17 +4,35 @@
 fn normalize_path(raw : String) -> String? {
   let path = raw.replace_all(old="\\", new="/")
   guard path != "" else { return None }
-  let absolute = path.has_prefix("/")
+  let drive_absolute = path.length() >= 3 &&
+    path[1] == ':' &&
+    path[2] == '/' &&
+    ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'))
+  if path.length() >= 2 && path[1] == ':' && !drive_absolute {
+    return None
+  }
+  let unc = path.has_prefix("//")
+  let absolute = !drive_absolute && !unc && path.has_prefix("/")
+  let root_depth = if drive_absolute { 1 } else if unc { 2 } else { 0 }
   let parts : Array[String] = []
   for part in path.split("/") {
     let segment = part.to_owned()
     match segment {
       "" | "." => ()
-      ".." => if parts.pop() is None { return None }
+      ".." => {
+        if parts.length() <= root_depth {
+          return None
+        }
+        ignore(parts.pop())
+      }
       _ => parts.push(segment)
     }
   }
-  if parts.length() == 0 {
+  if unc && parts.length() < 2 {
+    None
+  } else if drive_absolute && parts.length() == 1 {
+    Some(parts[0] + "/")
+  } else if parts.length() == 0 {
     if absolute {
       Some("/")
     } else {
@@ -22,7 +40,9 @@ fn normalize_path(raw : String) -> String? {
     }
   } else {
     let joined = parts.iter().join("/")
-    if absolute {
+    if unc {
+      Some("//" + joined)
+    } else if absolute {
       Some("/" + joined)
     } else {
       Some(joined)

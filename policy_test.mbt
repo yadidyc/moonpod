@@ -28,14 +28,55 @@ test "rejects traversal and sibling-prefix paths" {
 }
 
 ///|
-test "normalizes Windows separators" {
+test "normalizes drive paths, backslashes, and repeated separators" {
   let policy = @moonpod.Policy::new(["fs.write"], write_roots=["C:\\work"])
   let session = @moonpod.Session::new(policy)
   assert_true(
     session
-    .authorize(@moonpod.WriteFile(path="C:\\work\\out.txt", bytes=12))
+    .authorize(@moonpod.WriteFile(path="C:\\work\\\\logs//out.txt", bytes=12))
     .is_allowed(),
   )
+}
+
+///|
+test "preserves UNC roots without aliasing POSIX paths" {
+  let policy = @moonpod.Policy::new(["fs.read"], read_roots=[
+    "\\\\server\\share",
+  ])
+  let session = @moonpod.Session::new(policy)
+  assert_true(
+    session
+    .authorize(
+      @moonpod.ReadFile(
+        path="\\\\server\\share\\docs//guide.md",
+        estimated_bytes=1,
+      ),
+    )
+    .is_allowed(),
+  )
+  assert_true(
+    session.authorize(
+      @moonpod.ReadFile(path="/server/share/docs/guide.md", estimated_bytes=1),
+    )
+    is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+  )
+}
+
+///|
+test "rejects empty paths and traversal beyond every root kind" {
+  let policy = @moonpod.Policy::new(["fs.read"], read_roots=[
+    "/safe", "C:\\safe", "\\\\server\\share",
+  ])
+  let session = @moonpod.Session::new(policy)
+  for
+    path in [
+      "", "/../safe/file", "C:\\..\\safe\\file", "\\\\server\\share\\..\\file",
+    ] {
+    assert_true(
+      session.authorize(@moonpod.ReadFile(path~, estimated_bytes=0))
+      is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+    )
+  }
 }
 
 ///|

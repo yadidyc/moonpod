@@ -5,6 +5,7 @@ pub(all) suberror PolicyConfigError {
   EmptyNetworkHost
   EmptyPortSet(String)
   InvalidNetworkPort(Int)
+  EmptyCommandProgram
 } derive(Debug, Eq)
 
 ///|
@@ -14,7 +15,7 @@ pub struct Policy {
   read_roots : Array[String]
   write_roots : Array[String]
   network_rules : Array[NetworkRule]
-  allowed_commands : Array[String]
+  command_rules : Array[CommandRule]
   max_calls : Int
   max_io_bytes : Int
 }
@@ -29,7 +30,7 @@ pub fn Policy::new(
   read_roots? : Array[String] = [],
   write_roots? : Array[String] = [],
   network_rules? : Array[NetworkRule] = [],
-  allowed_commands? : Array[String] = [],
+  command_rules? : Array[CommandRule] = [],
   max_calls? : Int = 100,
   max_io_bytes? : Int = 1048576,
 ) -> Policy raise PolicyConfigError {
@@ -47,7 +48,7 @@ pub fn Policy::new(
     read_roots: read_roots.copy(),
     write_roots: write_roots.copy(),
     network_rules: network_rules.copy(),
-    allowed_commands: allowed_commands.copy(),
+    command_rules: command_rules.copy(),
     max_calls,
     max_io_bytes,
   }
@@ -60,7 +61,11 @@ pub fn workspace_policy(root : String) -> Policy {
     ["fs.read", "fs.write", "process.run"],
     read_roots=[root],
     write_roots=[root],
-    allowed_commands=["moon"],
+    command_rules=[
+      CommandRule::new(program="moon", argument_prefix=["check"]),
+      CommandRule::new(program="moon", argument_prefix=["test"]),
+      CommandRule::new(program="moon", argument_prefix=["build"]),
+    ],
     max_calls=200,
     max_io_bytes=16777216,
   )
@@ -116,12 +121,25 @@ fn Policy::decide(
         Deny(HostNotAllowed(host))
       }
     }
-    RunCommand(program~, ..) =>
-      if self.allowed_commands.contains(program) {
+    RunCommand(program~, arguments~, ..) => {
+      let mut program_matched = false
+      let mut arguments_allowed = false
+      for rule in self.command_rules {
+        if rule.matches_program(program) {
+          program_matched = true
+          if rule.allows_arguments(arguments) {
+            arguments_allowed = true
+          }
+        }
+      }
+      if arguments_allowed {
         Allow
+      } else if program_matched {
+        Deny(CommandArgumentsNotAllowed(program))
       } else {
         Deny(CommandNotAllowed(program))
       }
+    }
     Invoke(..) => Allow
   }
   guard scoped is Allow else { return scoped }

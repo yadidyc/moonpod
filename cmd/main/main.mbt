@@ -5,7 +5,11 @@ fn main {
   let operations = [
     @moonpod.ReadFile(path="/workspace/README.mbt.md", estimated_bytes=2048),
     @moonpod.WriteFile(path="/etc/passwd", bytes=12),
-    @moonpod.RunCommand(program="moon", estimated_output_bytes=4096),
+    @moonpod.RunCommand(
+      program="moon",
+      arguments=["test"],
+      estimated_output_bytes=4096,
+    ),
     @moonpod.Connect(host="example.com", port=443),
   ]
   println("MoonPod policy demo")

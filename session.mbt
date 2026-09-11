@@ -24,7 +24,12 @@ pub fn Session::authorize(self : Session, operation : Operation) -> Decision {
   self.attempts = sequence
   let charged_bytes = if decision is Allow { operation.byte_cost() } else { 0 }
   self.used_bytes = self.used_bytes + charged_bytes
-  self.events.push({ sequence, operation, decision, charged_bytes, })
+  self.events.push({
+    sequence,
+    operation: operation.snapshot(),
+    decision,
+    charged_bytes,
+  })
   decision
 }
 

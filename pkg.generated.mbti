@@ -14,6 +14,7 @@ pub(all) suberror PolicyConfigError {
   EmptyNetworkHost
   EmptyPortSet(String)
   InvalidNetworkPort(Int)
+  EmptyCommandProgram
 } derive(Eq, @debug.Debug)
 
 // Types and methods
@@ -23,6 +24,12 @@ pub(all) struct AuditEvent {
   decision : Decision
   charged_bytes : Int
 } derive(Eq, @debug.Debug)
+
+pub struct CommandRule {
+  program : String
+  argument_prefix : Array[String]
+} derive(Eq, @debug.Debug)
+pub fn CommandRule::new(program~ : String, argument_prefix~ : Array[String]) -> Self raise PolicyConfigError
 
 pub(all) enum Decision {
   Allow
@@ -39,6 +46,7 @@ pub(all) enum DenyReason {
   HostNotAllowed(String)
   PortNotAllowed(host~ : String, port~ : Int)
   CommandNotAllowed(String)
+  CommandArgumentsNotAllowed(String)
   InvalidByteEstimate(Int)
 } derive(Eq, @debug.Debug)
 pub fn DenyReason::summary(Self) -> String
@@ -53,7 +61,7 @@ pub(all) enum Operation {
   ReadFile(path~ : String, estimated_bytes~ : Int)
   WriteFile(path~ : String, bytes~ : Int)
   Connect(host~ : String, port~ : Int)
-  RunCommand(program~ : String, estimated_output_bytes~ : Int)
+  RunCommand(program~ : String, arguments~ : Array[String], estimated_output_bytes~ : Int)
   Invoke(tool~ : String, estimated_output_bytes~ : Int)
 } derive(Eq, @debug.Debug)
 pub fn Operation::tool_name(Self) -> String
@@ -63,11 +71,11 @@ pub struct Policy {
   read_roots : Array[String]
   write_roots : Array[String]
   network_rules : Array[NetworkRule]
-  allowed_commands : Array[String]
+  command_rules : Array[CommandRule]
   max_calls : Int
   max_io_bytes : Int
 }
-pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], network_rules? : Array[NetworkRule], allowed_commands? : Array[String], max_calls? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
+pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], network_rules? : Array[NetworkRule], command_rules? : Array[CommandRule], max_calls? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
 
 pub struct Session {
   policy : Policy

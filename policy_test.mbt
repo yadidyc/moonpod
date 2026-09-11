@@ -39,15 +39,9 @@ test "normalizes Windows separators" {
 }
 
 ///|
-test "enforces tool and command allowlists" {
-  let policy = @moonpod.Policy::new(["process.run"], allowed_commands=["moon"])
+test "enforces tool allowlist" {
+  let policy = @moonpod.Policy::new([])
   let session = @moonpod.Session::new(policy)
-  assert_true(
-    session.authorize(
-      @moonpod.RunCommand(program="powershell", estimated_output_bytes=0),
-    )
-    is @moonpod.Deny(@moonpod.CommandNotAllowed(_)),
-  )
   assert_true(
     session.authorize(
       @moonpod.Invoke(tool="browser.open", estimated_output_bytes=0),

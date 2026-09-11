@@ -10,7 +10,7 @@ MoonPod 是一个纯 MoonBit、无 I/O 副作用的策略核心。它将智能�
 
 - 默认拒绝的工具白名单
 - 防目录穿越的词法路径根隔离
-- 网络主机—端口对和外部命令白名单
+- 网络主机—端口对和命令参数前缀白名单
 - 每会话调用次数与 I/O 字节预算
 - 防篡改快照式审计日志
 - 不依赖操作系统 API，适合嵌入不同 Agent Runtime
@@ -26,13 +26,17 @@ moon run cmd/main
 ```mbt check
 ///|
 test "workspace isolation" {
+  let moon_test = @moonpod.CommandRule::new(program="moon", argument_prefix=[
+    "test",
+  ])
   let policy = @moonpod.Policy::new(
-    ["fs.read", "fs.write", "net.connect"],
+    ["fs.read", "fs.write", "net.connect", "process.run"],
     read_roots=["/workspace"],
     write_roots=["/workspace/out"],
     network_rules=[
       @moonpod.NetworkRule::new(host="api.example.com", allowed_ports=[443]),
     ],
+    command_rules=[moon_test],
     max_calls=20,
     max_io_bytes=1048576,
   )
@@ -57,6 +61,27 @@ test "workspace isolation" {
     session.authorize(@moonpod.Connect(host="api.example.com", port=22))
     is @moonpod.Deny(@moonpod.PortNotAllowed(..)),
   )
+  assert_true(
+    session
+    .authorize(
+      @moonpod.RunCommand(
+        program="moon",
+        arguments=["test", "--target", "all"],
+        estimated_output_bytes=4096,
+      ),
+    )
+    .is_allowed(),
+  )
+  assert_true(
+    session.authorize(
+      @moonpod.RunCommand(
+        program="moon",
+        arguments=["publish"],
+        estimated_output_bytes=0,
+      ),
+    )
+    is @moonpod.Deny(@moonpod.CommandArgumentsNotAllowed(_)),
+  )
 }
 ```
 
@@ -70,7 +95,7 @@ test "workspace isolation" {
 ## 限制
 
 - 路径检查是词法级的，不解析符号链接；宿主在真实文件系统上执行前必须再做规范化与 symlink 防护。
-- `RunCommand` 只约束可执行程序名；宿主应对参数使用更细粒度的前缀策略。
+- `RunCommand` 对可执行程序名做精确匹配，并对参数数组做逐项前缀匹配；它不会调用 shell 解析命令字符串。
 - 当前未包含进程、容器或网络执行器。
 
 完整的信任边界、攻击面与宿主适配器清单见

@@ -4,7 +4,7 @@
 
 - Files outside the declared read and write roots
 - Network services not present in the host allowlist
-- Programs not present in the command allowlist
+- Program and argument combinations not present in the command rules
 - Host availability, bounded through call and byte budgets
 - A complete decision trail for incident review
 
@@ -29,7 +29,9 @@ or enforcing a decision must never become an implicit allow.
 - File paths are normalized lexically and matched on segment boundaries, so
   `/workspace-other` is not treated as a child of `/workspace`.
 - `..` traversal above the lexical root is rejected.
-- Host and port pairs, plus executable names, use exact allowlist matching.
+- Host and port pairs use exact allowlist matching.
+- Executable names use exact matching and arguments use element-wise prefix
+  matching; an empty prefix permits only a no-argument invocation.
 - Denied calls still consume call budget, limiting repeated probing.
 - I/O estimates are checked without integer-addition overflow.
 - Audit logs are returned as defensive array copies.
@@ -39,7 +41,6 @@ or enforcing a decision must never become an implicit allow.
 - Symbolic-link and junction resolution
 - OS process isolation and resource quotas
 - DNS rebinding and IP-range enforcement
-- Command argument-prefix policies
 - Authentication, secrets storage, and encrypted audit persistence
 
 These controls belong in the trusted host adapter or a container/Wasm policy.
@@ -52,5 +53,6 @@ MoonPod complements those mechanisms; it does not replace them.
 3. Perform the side effect only for `Allow`.
 4. Re-resolve file paths on the host and reject symlink/junction escapes.
 5. Resolve hosts to permitted IP ranges when the environment requires it.
-6. Constrain command arguments and run child processes in an OS sandbox.
+6. Pass arguments directly without shell interpolation and run child processes
+   in an OS sandbox.
 7. Persist the returned audit snapshot outside the agent's writable roots.

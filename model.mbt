@@ -7,7 +7,11 @@ pub(all) enum Operation {
   ReadFile(path~ : String, estimated_bytes~ : Int)
   WriteFile(path~ : String, bytes~ : Int)
   Connect(host~ : String, port~ : Int)
-  RunCommand(program~ : String, estimated_output_bytes~ : Int)
+  RunCommand(
+    program~ : String,
+    arguments~ : Array[String],
+    estimated_output_bytes~ : Int
+  )
   Invoke(tool~ : String, estimated_output_bytes~ : Int)
 } derive(Debug, Eq)
 
@@ -51,6 +55,45 @@ fn NetworkRule::allows_port(self : NetworkRule, port : Int) -> Bool {
 }
 
 ///|
+/// An exact executable name and an allowed argument prefix.
+///
+/// Prefix elements are compared as complete arguments. An empty prefix permits
+/// only a command with no arguments.
+pub struct CommandRule {
+  program : String
+  argument_prefix : Array[String]
+} derive(Debug, Eq)
+
+///|
+/// Creates an immutable command rule.
+pub fn CommandRule::new(
+  program~ : String,
+  argument_prefix~ : Array[String],
+) -> CommandRule raise PolicyConfigError {
+  if program == "" {
+    raise PolicyConfigError::EmptyCommandProgram
+  }
+  { program, argument_prefix: argument_prefix.copy(), }
+}
+
+///|
+fn CommandRule::matches_program(self : CommandRule, program : String) -> Bool {
+  self.program == program
+}
+
+///|
+fn CommandRule::allows_arguments(
+  self : CommandRule,
+  arguments : Array[String],
+) -> Bool {
+  if self.argument_prefix.length() == 0 {
+    arguments.length() == 0
+  } else {
+    arguments.starts_with(self.argument_prefix)
+  }
+}
+
+///|
 /// A machine-readable reason for rejecting an operation.
 pub(all) enum DenyReason {
   CallBudgetExceeded(limit~ : Int)
@@ -60,6 +103,7 @@ pub(all) enum DenyReason {
   HostNotAllowed(String)
   PortNotAllowed(host~ : String, port~ : Int)
   CommandNotAllowed(String)
+  CommandArgumentsNotAllowed(String)
   InvalidByteEstimate(Int)
 } derive(Debug, Eq)
 
@@ -106,6 +150,8 @@ pub fn DenyReason::summary(self : DenyReason) -> String {
     HostNotAllowed(host) => "host not allowed: \{host}"
     PortNotAllowed(host~, port~) => "port not allowed: \{host}:\{port}"
     CommandNotAllowed(program) => "command not allowed: \{program}"
+    CommandArgumentsNotAllowed(program) =>
+      "command arguments not allowed: \{program}"
     InvalidByteEstimate(value) => "invalid byte estimate: \{value}"
   }
 }
@@ -129,5 +175,15 @@ fn Operation::byte_cost(self : Operation) -> Int {
     Connect(..) => 0
     RunCommand(estimated_output_bytes~, ..) => estimated_output_bytes
     Invoke(estimated_output_bytes~, ..) => estimated_output_bytes
+  }
+}
+
+///|
+/// Copies mutable operation payloads before they enter the audit log.
+fn Operation::snapshot(self : Operation) -> Operation {
+  match self {
+    RunCommand(program~, arguments~, estimated_output_bytes~) =>
+      RunCommand(program~, arguments=arguments.copy(), estimated_output_bytes~)
+    _ => self
   }
 }

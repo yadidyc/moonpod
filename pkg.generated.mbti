@@ -1,0 +1,78 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yadidyc/moonpod"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn workspace_policy(String) -> Policy
+
+// Errors
+pub(all) suberror PolicyConfigError {
+  InvalidLimit(name~ : String, value~ : Int)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub(all) struct AuditEvent {
+  sequence : Int
+  operation : Operation
+  decision : Decision
+  charged_bytes : Int
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Decision {
+  Allow
+  Deny(DenyReason)
+} derive(Eq, @debug.Debug)
+pub fn Decision::is_allowed(Self) -> Bool
+pub fn Decision::summary(Self) -> String
+
+pub(all) enum DenyReason {
+  CallBudgetExceeded(limit~ : Int)
+  IoBudgetExceeded(limit~ : Int, requested~ : Int)
+  ToolNotAllowed(String)
+  PathNotAllowed(String)
+  HostNotAllowed(String)
+  CommandNotAllowed(String)
+  InvalidByteEstimate(Int)
+} derive(Eq, @debug.Debug)
+pub fn DenyReason::summary(Self) -> String
+
+pub(all) enum Operation {
+  ReadFile(path~ : String, estimated_bytes~ : Int)
+  WriteFile(path~ : String, bytes~ : Int)
+  Connect(host~ : String, port~ : Int)
+  RunCommand(program~ : String, estimated_output_bytes~ : Int)
+  Invoke(tool~ : String, estimated_output_bytes~ : Int)
+} derive(Eq, @debug.Debug)
+pub fn Operation::tool_name(Self) -> String
+
+pub struct Policy {
+  allowed_tools : Array[String]
+  read_roots : Array[String]
+  write_roots : Array[String]
+  allowed_hosts : Array[String]
+  allowed_commands : Array[String]
+  max_calls : Int
+  max_io_bytes : Int
+}
+pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], allowed_hosts? : Array[String], allowed_commands? : Array[String], max_calls? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
+
+pub struct Session {
+  policy : Policy
+  mut attempts : Int
+  mut used_bytes : Int
+  events : Array[AuditEvent]
+}
+pub fn Session::attempts(Self) -> Int
+pub fn Session::audit_log(Self) -> Array[AuditEvent]
+pub fn Session::authorize(Self, Operation) -> Decision
+pub fn Session::new(Policy) -> Self
+pub fn Session::remaining_bytes(Self) -> Int
+pub fn Session::remaining_calls(Self) -> Int
+pub fn Session::used_bytes(Self) -> Int
+
+// Type aliases
+
+// Traits

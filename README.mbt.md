@@ -10,7 +10,7 @@ MoonPod 是一个纯 MoonBit、无 I/O 副作用的策略核心。它将智能�
 
 - 默认拒绝的工具白名单
 - 防目录穿越的词法路径根隔离
-- 网络主机和外部命令白名单
+- 网络主机—端口对和外部命令白名单
 - 每会话调用次数与 I/O 字节预算
 - 防篡改快照式审计日志
 - 不依赖操作系统 API，适合嵌入不同 Agent Runtime
@@ -30,7 +30,9 @@ test "workspace isolation" {
     ["fs.read", "fs.write", "net.connect"],
     read_roots=["/workspace"],
     write_roots=["/workspace/out"],
-    allowed_hosts=["api.example.com"],
+    network_rules=[
+      @moonpod.NetworkRule::new(host="api.example.com", allowed_ports=[443]),
+    ],
     max_calls=20,
     max_io_bytes=1048576,
   )
@@ -45,6 +47,15 @@ test "workspace isolation" {
   assert_true(
     session.authorize(@moonpod.WriteFile(path="/etc/hosts", bytes=20))
     is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+  )
+  assert_true(
+    session
+    .authorize(@moonpod.Connect(host="api.example.com", port=443))
+    .is_allowed(),
+  )
+  assert_true(
+    session.authorize(@moonpod.Connect(host="api.example.com", port=22))
+    is @moonpod.Deny(@moonpod.PortNotAllowed(..)),
   )
 }
 ```

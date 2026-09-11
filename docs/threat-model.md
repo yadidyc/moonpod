@@ -29,7 +29,7 @@ or enforcing a decision must never become an implicit allow.
 - File paths are normalized lexically and matched on segment boundaries, so
   `/workspace-other` is not treated as a child of `/workspace`.
 - `..` traversal above the lexical root is rejected.
-- Hosts and executable names use exact allowlist matching.
+- Host and port pairs, plus executable names, use exact allowlist matching.
 - Denied calls still consume call budget, limiting repeated probing.
 - I/O estimates are checked without integer-addition overflow.
 - Audit logs are returned as defensive array copies.

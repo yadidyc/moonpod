@@ -11,6 +11,9 @@ pub fn workspace_policy(String) -> Policy
 // Errors
 pub(all) suberror PolicyConfigError {
   InvalidLimit(name~ : String, value~ : Int)
+  EmptyNetworkHost
+  EmptyPortSet(String)
+  InvalidNetworkPort(Int)
 } derive(Eq, @debug.Debug)
 
 // Types and methods
@@ -34,10 +37,17 @@ pub(all) enum DenyReason {
   ToolNotAllowed(String)
   PathNotAllowed(String)
   HostNotAllowed(String)
+  PortNotAllowed(host~ : String, port~ : Int)
   CommandNotAllowed(String)
   InvalidByteEstimate(Int)
 } derive(Eq, @debug.Debug)
 pub fn DenyReason::summary(Self) -> String
+
+pub struct NetworkRule {
+  host : String
+  allowed_ports : Array[Int]
+} derive(Eq, @debug.Debug)
+pub fn NetworkRule::new(host~ : String, allowed_ports~ : Array[Int]) -> Self raise PolicyConfigError
 
 pub(all) enum Operation {
   ReadFile(path~ : String, estimated_bytes~ : Int)
@@ -52,12 +62,12 @@ pub struct Policy {
   allowed_tools : Array[String]
   read_roots : Array[String]
   write_roots : Array[String]
-  allowed_hosts : Array[String]
+  network_rules : Array[NetworkRule]
   allowed_commands : Array[String]
   max_calls : Int
   max_io_bytes : Int
 }
-pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], allowed_hosts? : Array[String], allowed_commands? : Array[String], max_calls? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
+pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], network_rules? : Array[NetworkRule], allowed_commands? : Array[String], max_calls? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
 
 pub struct Session {
   policy : Policy

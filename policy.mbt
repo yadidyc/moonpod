@@ -2,6 +2,9 @@
 /// Invalid policy configuration.
 pub(all) suberror PolicyConfigError {
   InvalidLimit(name~ : String, value~ : Int)
+  EmptyNetworkHost
+  EmptyPortSet(String)
+  InvalidNetworkPort(Int)
 } derive(Debug, Eq)
 
 ///|
@@ -10,7 +13,7 @@ pub struct Policy {
   allowed_tools : Array[String]
   read_roots : Array[String]
   write_roots : Array[String]
-  allowed_hosts : Array[String]
+  network_rules : Array[NetworkRule]
   allowed_commands : Array[String]
   max_calls : Int
   max_io_bytes : Int
@@ -25,7 +28,7 @@ pub fn Policy::new(
   allowed_tools : Array[String],
   read_roots? : Array[String] = [],
   write_roots? : Array[String] = [],
-  allowed_hosts? : Array[String] = [],
+  network_rules? : Array[NetworkRule] = [],
   allowed_commands? : Array[String] = [],
   max_calls? : Int = 100,
   max_io_bytes? : Int = 1048576,
@@ -43,7 +46,7 @@ pub fn Policy::new(
     allowed_tools: allowed_tools.copy(),
     read_roots: read_roots.copy(),
     write_roots: write_roots.copy(),
-    allowed_hosts: allowed_hosts.copy(),
+    network_rules: network_rules.copy(),
     allowed_commands: allowed_commands.copy(),
     max_calls,
     max_io_bytes,
@@ -94,12 +97,25 @@ fn Policy::decide(
       } else {
         Deny(PathNotAllowed(path))
       }
-    Connect(host~, ..) =>
-      if self.allowed_hosts.contains(host) {
+    Connect(host~, port~) => {
+      let mut host_matched = false
+      let mut port_allowed = false
+      for rule in self.network_rules {
+        if rule.matches_host(host) {
+          host_matched = true
+          if rule.allows_port(port) {
+            port_allowed = true
+          }
+        }
+      }
+      if port_allowed {
         Allow
+      } else if host_matched {
+        Deny(PortNotAllowed(host~, port~))
       } else {
         Deny(HostNotAllowed(host))
       }
+    }
     RunCommand(program~, ..) =>
       if self.allowed_commands.contains(program) {
         Allow

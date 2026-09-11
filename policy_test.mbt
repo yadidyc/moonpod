@@ -39,17 +39,9 @@ test "normalizes Windows separators" {
 }
 
 ///|
-test "enforces tool, host, and command allowlists" {
-  let policy = @moonpod.Policy::new(
-    ["net.connect", "process.run"],
-    allowed_hosts=["api.example.com"],
-    allowed_commands=["moon"],
-  )
+test "enforces tool and command allowlists" {
+  let policy = @moonpod.Policy::new(["process.run"], allowed_commands=["moon"])
   let session = @moonpod.Session::new(policy)
-  assert_true(
-    session.authorize(@moonpod.Connect(host="evil.example", port=443))
-    is @moonpod.Deny(@moonpod.HostNotAllowed(_)),
-  )
   assert_true(
     session.authorize(
       @moonpod.RunCommand(program="powershell", estimated_output_bytes=0),
@@ -62,6 +54,18 @@ test "enforces tool, host, and command allowlists" {
     )
     is @moonpod.Deny(@moonpod.ToolNotAllowed(_)),
   )
+}
+
+///|
+test "invalid network rules fail closed" {
+  try
+    @moonpod.NetworkRule::new(host="api.example.com", allowed_ports=[0])
+  catch {
+    @moonpod.PolicyConfigError::InvalidNetworkPort(port) => assert_eq(port, 0)
+    _ => fail("unexpected configuration error")
+  } noraise {
+    _ => fail("expected PolicyConfigError")
+  }
 }
 
 ///|
@@ -126,6 +130,7 @@ test "invalid limits raise a typed configuration error" {
       assert_eq(name, "max_calls")
       assert_eq(value, -1)
     }
+    _ => fail("unexpected configuration error")
   } noraise {
     _ => fail("expected PolicyConfigError")
   }

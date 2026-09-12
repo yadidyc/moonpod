@@ -94,9 +94,36 @@ fn CommandRule::allows_arguments(
 }
 
 ///|
+/// A maximum number of attempts for one exact tool name.
+pub struct ToolQuota {
+  tool : String
+  max_calls : Int
+} derive(Debug, Eq)
+
+///|
+/// Creates a validated per-tool call quota.
+pub fn ToolQuota::new(
+  tool~ : String,
+  max_calls~ : Int,
+) -> ToolQuota raise PolicyConfigError {
+  if tool == "" {
+    raise PolicyConfigError::EmptyToolQuotaName
+  }
+  if max_calls < 0 {
+    raise PolicyConfigError::InvalidLimit(
+      name="tool quota: " + tool,
+      value=max_calls,
+    )
+  }
+  { tool, max_calls, }
+}
+
+///|
 /// A machine-readable reason for rejecting an operation.
 pub(all) enum DenyReason {
   CallBudgetExceeded(limit~ : Int)
+  ToolCallQuotaExceeded(tool~ : String, limit~ : Int)
+  OperationByteLimitExceeded(limit~ : Int, requested~ : Int)
   IoBudgetExceeded(limit~ : Int, requested~ : Int)
   ToolNotAllowed(String)
   PathNotAllowed(String)
@@ -143,6 +170,10 @@ pub fn Decision::summary(self : Decision) -> String {
 pub fn DenyReason::summary(self : DenyReason) -> String {
   match self {
     CallBudgetExceeded(limit~) => "call budget exceeded (limit \{limit})"
+    ToolCallQuotaExceeded(tool~, limit~) =>
+      "tool call quota exceeded: \{tool} (limit \{limit})"
+    OperationByteLimitExceeded(limit~, requested~) =>
+      "operation byte limit exceeded (limit \{limit}, requested \{requested})"
     IoBudgetExceeded(limit~, requested~) =>
       "I/O budget exceeded (limit \{limit}, requested \{requested})"
     ToolNotAllowed(tool) => "tool not allowed: \{tool}"

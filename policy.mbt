@@ -6,6 +6,7 @@ pub(all) suberror PolicyConfigError {
   EmptyPortSet(String)
   InvalidNetworkPort(Int)
   EmptyCommandProgram
+  EmptyToolQuotaName
 } derive(Debug, Eq)
 
 ///|
@@ -14,9 +15,12 @@ pub struct Policy {
   allowed_tools : Array[String]
   read_roots : Array[String]
   write_roots : Array[String]
+  protected_paths : Array[String]
   network_rules : Array[NetworkRule]
   command_rules : Array[CommandRule]
+  tool_quotas : Array[ToolQuota]
   max_calls : Int
+  max_operation_bytes : Int
   max_io_bytes : Int
 }
 
@@ -29,9 +33,12 @@ pub fn Policy::new(
   allowed_tools : Array[String],
   read_roots? : Array[String] = [],
   write_roots? : Array[String] = [],
+  protected_paths? : Array[String] = [],
   network_rules? : Array[NetworkRule] = [],
   command_rules? : Array[CommandRule] = [],
+  tool_quotas? : Array[ToolQuota] = [],
   max_calls? : Int = 100,
+  max_operation_bytes? : Int = 1048576,
   max_io_bytes? : Int = 1048576,
 ) -> Policy raise PolicyConfigError {
   if max_calls < 0 {
@@ -43,13 +50,22 @@ pub fn Policy::new(
       value=max_io_bytes,
     )
   }
+  if max_operation_bytes < 0 {
+    raise PolicyConfigError::InvalidLimit(
+      name="max_operation_bytes",
+      value=max_operation_bytes,
+    )
+  }
   {
     allowed_tools: allowed_tools.copy(),
     read_roots: read_roots.copy(),
     write_roots: write_roots.copy(),
+    protected_paths: protected_paths.copy(),
     network_rules: network_rules.copy(),
     command_rules: command_rules.copy(),
+    tool_quotas: tool_quotas.copy(),
     max_calls,
+    max_operation_bytes,
     max_io_bytes,
   }
 }
@@ -61,6 +77,7 @@ pub fn workspace_policy(root : String) -> Policy {
     ["fs.read", "fs.write", "process.run"],
     read_roots=[root],
     write_roots=[root],
+    protected_paths=[root + "/.git", root + "/.env"],
     command_rules=[
       CommandRule::new(program="moon", argument_prefix=["check"]),
       CommandRule::new(program="moon", argument_prefix=["test"]),
@@ -75,29 +92,40 @@ pub fn workspace_policy(root : String) -> Policy {
 fn Policy::decide(
   self : Policy,
   attempts : Int,
+  tool_attempts : Int,
   used_bytes : Int,
   operation : Operation,
 ) -> Decision {
   if attempts >= self.max_calls {
     return Deny(CallBudgetExceeded(limit=self.max_calls))
   }
+  let tool = operation.tool_name()
+  for quota in self.tool_quotas {
+    if quota.tool == tool && tool_attempts >= quota.max_calls {
+      return Deny(ToolCallQuotaExceeded(tool~, limit=quota.max_calls))
+    }
+  }
   let cost = operation.byte_cost()
   if cost < 0 {
     return Deny(InvalidByteEstimate(cost))
   }
-  let tool = operation.tool_name()
+  if cost > self.max_operation_bytes {
+    return Deny(
+      OperationByteLimitExceeded(limit=self.max_operation_bytes, requested=cost),
+    )
+  }
   if !self.allowed_tools.contains(tool) {
     return Deny(ToolNotAllowed(tool))
   }
   let scoped = match operation {
     ReadFile(path~, ..) =>
-      if path_is_within(path, self.read_roots) {
+      if path_is_allowed(path, self.read_roots, self.protected_paths) {
         Allow
       } else {
         Deny(PathNotAllowed(path))
       }
     WriteFile(path~, ..) =>
-      if path_is_within(path, self.write_roots) {
+      if path_is_allowed(path, self.write_roots, self.protected_paths) {
         Allow
       } else {
         Deny(PathNotAllowed(path))

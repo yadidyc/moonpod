@@ -15,6 +15,7 @@ pub(all) suberror PolicyConfigError {
   EmptyPortSet(String)
   InvalidNetworkPort(Int)
   EmptyCommandProgram
+  EmptyToolQuotaName
 } derive(Eq, @debug.Debug)
 
 // Types and methods
@@ -40,6 +41,8 @@ pub fn Decision::summary(Self) -> String
 
 pub(all) enum DenyReason {
   CallBudgetExceeded(limit~ : Int)
+  ToolCallQuotaExceeded(tool~ : String, limit~ : Int)
+  OperationByteLimitExceeded(limit~ : Int, requested~ : Int)
   IoBudgetExceeded(limit~ : Int, requested~ : Int)
   ToolNotAllowed(String)
   PathNotAllowed(String)
@@ -70,16 +73,20 @@ pub struct Policy {
   allowed_tools : Array[String]
   read_roots : Array[String]
   write_roots : Array[String]
+  protected_paths : Array[String]
   network_rules : Array[NetworkRule]
   command_rules : Array[CommandRule]
+  tool_quotas : Array[ToolQuota]
   max_calls : Int
+  max_operation_bytes : Int
   max_io_bytes : Int
 }
-pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], network_rules? : Array[NetworkRule], command_rules? : Array[CommandRule], max_calls? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
+pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], protected_paths? : Array[String], network_rules? : Array[NetworkRule], command_rules? : Array[CommandRule], tool_quotas? : Array[ToolQuota], max_calls? : Int, max_operation_bytes? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
 
 pub struct Session {
   policy : Policy
   mut attempts : Int
+  tool_attempts : Map[String, Int]
   mut used_bytes : Int
   events : Array[AuditEvent]
 }
@@ -90,6 +97,12 @@ pub fn Session::new(Policy) -> Self
 pub fn Session::remaining_bytes(Self) -> Int
 pub fn Session::remaining_calls(Self) -> Int
 pub fn Session::used_bytes(Self) -> Int
+
+pub struct ToolQuota {
+  tool : String
+  max_calls : Int
+} derive(Eq, @debug.Debug)
+pub fn ToolQuota::new(tool~ : String, max_calls~ : Int) -> Self raise PolicyConfigError
 
 // Type aliases
 

@@ -42,7 +42,6 @@ pub fn Decision::summary(Self) -> String
 pub(all) enum DenyReason {
   CallBudgetExceeded(limit~ : Int)
   ToolCallQuotaExceeded(tool~ : String, limit~ : Int)
-  OperationByteLimitExceeded(limit~ : Int, requested~ : Int)
   IoBudgetExceeded(limit~ : Int, requested~ : Int)
   ToolNotAllowed(String)
   PathNotAllowed(String)
@@ -78,10 +77,9 @@ pub struct Policy {
   command_rules : Array[CommandRule]
   tool_quotas : Array[ToolQuota]
   max_calls : Int
-  max_operation_bytes : Int
   max_io_bytes : Int
 }
-pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], protected_paths? : Array[String], network_rules? : Array[NetworkRule], command_rules? : Array[CommandRule], tool_quotas? : Array[ToolQuota], max_calls? : Int, max_operation_bytes? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
+pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], protected_paths? : Array[String], network_rules? : Array[NetworkRule], command_rules? : Array[CommandRule], tool_quotas? : Array[ToolQuota], max_calls? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
 
 pub struct Session {
   policy : Policy

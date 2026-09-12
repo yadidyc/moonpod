@@ -20,7 +20,6 @@ pub struct Policy {
   command_rules : Array[CommandRule]
   tool_quotas : Array[ToolQuota]
   max_calls : Int
-  max_operation_bytes : Int
   max_io_bytes : Int
 }
 
@@ -38,7 +37,6 @@ pub fn Policy::new(
   command_rules? : Array[CommandRule] = [],
   tool_quotas? : Array[ToolQuota] = [],
   max_calls? : Int = 100,
-  max_operation_bytes? : Int = 1048576,
   max_io_bytes? : Int = 1048576,
 ) -> Policy raise PolicyConfigError {
   if max_calls < 0 {
@@ -50,12 +48,6 @@ pub fn Policy::new(
       value=max_io_bytes,
     )
   }
-  if max_operation_bytes < 0 {
-    raise PolicyConfigError::InvalidLimit(
-      name="max_operation_bytes",
-      value=max_operation_bytes,
-    )
-  }
   {
     allowed_tools: allowed_tools.copy(),
     read_roots: read_roots.copy(),
@@ -65,7 +57,6 @@ pub fn Policy::new(
     command_rules: command_rules.copy(),
     tool_quotas: tool_quotas.copy(),
     max_calls,
-    max_operation_bytes,
     max_io_bytes,
   }
 }
@@ -108,11 +99,6 @@ fn Policy::decide(
   let cost = operation.byte_cost()
   if cost < 0 {
     return Deny(InvalidByteEstimate(cost))
-  }
-  if cost > self.max_operation_bytes {
-    return Deny(
-      OperationByteLimitExceeded(limit=self.max_operation_bytes, requested=cost),
-    )
   }
   if !self.allowed_tools.contains(tool) {
     return Deny(ToolNotAllowed(tool))

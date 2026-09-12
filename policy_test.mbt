@@ -80,6 +80,34 @@ test "rejects empty paths and traversal beyond every root kind" {
 }
 
 ///|
+test "protected paths override allowed workspace roots" {
+  let policy = @moonpod.Policy::new(
+    ["fs.read", "fs.write"],
+    read_roots=["/workspace"],
+    write_roots=["/workspace"],
+    protected_paths=["/workspace/.git", "/workspace/.env"],
+  )
+  let session = @moonpod.Session::new(policy)
+  assert_true(
+    session
+    .authorize(
+      @moonpod.ReadFile(path="/workspace/src/main.mbt", estimated_bytes=1),
+    )
+    .is_allowed(),
+  )
+  assert_true(
+    session.authorize(
+      @moonpod.ReadFile(path="/workspace/.git/config", estimated_bytes=1),
+    )
+    is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+  )
+  assert_true(
+    session.authorize(@moonpod.WriteFile(path="/workspace/.env", bytes=1))
+    is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+  )
+}
+
+///|
 test "enforces tool allowlist" {
   let policy = @moonpod.Policy::new([])
   let session = @moonpod.Session::new(policy)

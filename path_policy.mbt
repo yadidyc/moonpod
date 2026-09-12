@@ -64,3 +64,12 @@ fn path_is_within(path : String, roots : Array[String]) -> Bool {
   }
   false
 }
+
+///|
+fn path_is_allowed(
+  path : String,
+  roots : Array[String],
+  protected_paths : Array[String],
+) -> Bool {
+  path_is_within(path, roots) && !path_is_within(path, protected_paths)
+}

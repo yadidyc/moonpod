@@ -123,6 +123,7 @@ pub fn ToolQuota::new(
 pub(all) enum DenyReason {
   CallBudgetExceeded(limit~ : Int)
   ToolCallQuotaExceeded(tool~ : String, limit~ : Int)
+  OperationByteLimitExceeded(limit~ : Int, requested~ : Int)
   IoBudgetExceeded(limit~ : Int, requested~ : Int)
   ToolNotAllowed(String)
   PathNotAllowed(String)
@@ -171,6 +172,8 @@ pub fn DenyReason::summary(self : DenyReason) -> String {
     CallBudgetExceeded(limit~) => "call budget exceeded (limit \{limit})"
     ToolCallQuotaExceeded(tool~, limit~) =>
       "tool call quota exceeded: \{tool} (limit \{limit})"
+    OperationByteLimitExceeded(limit~, requested~) =>
+      "operation byte limit exceeded (limit \{limit}, requested \{requested})"
     IoBudgetExceeded(limit~, requested~) =>
       "I/O budget exceeded (limit \{limit}, requested \{requested})"
     ToolNotAllowed(tool) => "tool not allowed: \{tool}"

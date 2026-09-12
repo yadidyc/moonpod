@@ -3,6 +3,7 @@
 pub struct Session {
   policy : Policy
   mut attempts : Int
+  tool_attempts : Map[String, Int]
   mut used_bytes : Int
   events : Array[AuditEvent]
 }
@@ -10,7 +11,7 @@ pub struct Session {
 ///|
 /// Starts a fresh session governed by `policy`.
 pub fn Session::new(policy : Policy) -> Session {
-  { policy, attempts: 0, used_bytes: 0, events: [], }
+  { policy, attempts: 0, tool_attempts: Map([]), used_bytes: 0, events: [], }
 }
 
 ///|
@@ -19,9 +20,20 @@ pub fn Session::new(policy : Policy) -> Session {
 /// Every attempt consumes one call slot. I/O bytes are charged only for
 /// allowed operations. This method never performs the operation itself.
 pub fn Session::authorize(self : Session, operation : Operation) -> Decision {
-  let decision = self.policy.decide(self.attempts, self.used_bytes, operation)
+  let tool = operation.tool_name()
+  let tool_attempts = match self.tool_attempts.get(tool) {
+    Some(count) => count
+    None => 0
+  }
+  let decision = self.policy.decide(
+    self.attempts,
+    tool_attempts,
+    self.used_bytes,
+    operation,
+  )
   let sequence = self.attempts + 1
   self.attempts = sequence
+  self.tool_attempts[tool] = tool_attempts + 1
   let charged_bytes = if decision is Allow { operation.byte_cost() } else { 0 }
   self.used_bytes = self.used_bytes + charged_bytes
   self.events.push({

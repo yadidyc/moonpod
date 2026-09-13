@@ -1,5 +1,6 @@
 import {
   "yadidyc/moonpod",
+  "moonbitlang/core/env",
 }
 
 pkgtype(kind: "executable")

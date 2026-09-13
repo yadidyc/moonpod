@@ -19,6 +19,14 @@ pub(all) suberror PolicyConfigError {
   EmptyApprovalToolName
 } derive(Eq, @debug.Debug)
 
+pub(all) suberror PolicyJsonError {
+  InvalidJson
+  ExpectedObject
+  MissingField(String)
+  InvalidField(String)
+  InvalidPolicy
+} derive(Eq, @debug.Debug)
+
 // Types and methods
 pub(all) struct ApprovalRequest {
   id : Int
@@ -94,6 +102,7 @@ pub struct Policy {
   max_operation_bytes : Int
   max_io_bytes : Int
 }
+pub fn Policy::from_json(String) -> Self raise PolicyJsonError
 pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], protected_paths? : Array[String], network_rules? : Array[NetworkRule], command_rules? : Array[CommandRule], tool_quotas? : Array[ToolQuota], max_calls? : Int, max_operation_bytes? : Int, max_io_bytes? : Int, approval_required_tools? : Array[String]) -> Self raise PolicyConfigError
 pub fn Policy::restrict(Self, Self) -> Self
 
@@ -109,6 +118,7 @@ pub struct Session {
 }
 pub fn Session::approve(Self, Int) -> Decision
 pub fn Session::attempts(Self) -> Int
+pub fn Session::audit_json(Self) -> String
 pub fn Session::audit_log(Self) -> Array[AuditEvent]
 pub fn Session::authorize(Self, Operation) -> Decision
 pub fn Session::close(Self) -> Unit

@@ -13,6 +13,7 @@ MoonPod 是一个纯 MoonBit、无 I/O 副作用的策略核心。它将智能�
 - 网络主机—端口对和命令参数前缀白名单
 - 每会话调用次数与 I/O 字节预算
 - 防篡改快照式审计日志
+- JSON 策略加载和可导出的 JSON 审计记录
 - 不依赖操作系统 API，适合嵌入不同 Agent Runtime
 
 ## 快速开始
@@ -22,6 +23,38 @@ moon check
 moon test
 moon run cmd/main
 ```
+
+## JSON 策略与审计导出
+
+命令行支持通过 `--policy-json` 加载 JSON 策略，并将本次演示操作的审计摘要和事件写成 JSON 到标准输出。可用 shell 重定向保存审计结果：
+
+```powershell
+moon run cmd/main -- --policy-json '{"allowed_tools":["fs.read"],"read_roots":["/workspace"]}' > audit.json
+```
+
+策略必须包含 `allowed_tools`。可选字段包括 `read_roots`、`write_roots`、`protected_paths`、`network_rules`、`command_rules`、`tool_quotas`、`approval_required_tools`、`max_calls`、`max_operation_bytes` 和 `max_io_bytes`。规则项格式如下：
+
+```json
+{
+  "allowed_tools": ["fs.read", "net.connect"],
+  "read_roots": ["/workspace"],
+  "protected_paths": ["/workspace/.env"],
+  "network_rules": [
+    {"host": "api.example.com", "allowed_ports": [443]}
+  ],
+  "command_rules": [
+    {"program": "moon", "argument_prefix": ["test"]}
+  ],
+  "tool_quotas": [
+    {"tool": "fs.read", "max_calls": 20}
+  ],
+  "max_calls": 100,
+  "max_operation_bytes": 1048576,
+  "max_io_bytes": 1048576
+}
+```
+
+无效 JSON 或不符合字段类型的策略会被拒绝；此时不会执行演示操作。
 
 ```mbt check
 ///|
@@ -108,6 +141,7 @@ model.mbt         操作、决策、拒绝原因与审计事件
 path_policy.mbt   路径归一化和边界判定
 policy.mbt        不可变策略与规则求值
 session.mbt       预算、调用计数和审计状态
+json_policy.mbt   JSON 策略解码和审计导出
 cmd/main          可运行演示
 ```
 

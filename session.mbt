@@ -2,6 +2,7 @@
 /// Mutable state for one isolated agent run.
 pub struct Session {
   policy : Policy
+  mut state : SessionState
   mut attempts : Int
   tool_attempts : Map[String, Int]
   mut used_bytes : Int
@@ -11,7 +12,26 @@ pub struct Session {
 ///|
 /// Starts a fresh session governed by `policy`.
 pub fn Session::new(policy : Policy) -> Session {
-  { policy, attempts: 0, tool_attempts: Map([]), used_bytes: 0, events: [], }
+  {
+    policy,
+    state: Active,
+    attempts: 0,
+    tool_attempts: Map([]),
+    used_bytes: 0,
+    events: [],
+  }
+}
+
+///|
+/// Returns the current lifecycle state.
+pub fn Session::state(self : Session) -> SessionState {
+  self.state
+}
+
+///|
+/// Closes this session. Closing an already closed session has no effect.
+pub fn Session::close(self : Session) -> Unit {
+  self.state = Closed
 }
 
 ///|
@@ -25,12 +45,16 @@ pub fn Session::authorize(self : Session, operation : Operation) -> Decision {
     Some(count) => count
     None => 0
   }
-  let decision = self.policy.decide(
-    self.attempts,
-    tool_attempts,
-    self.used_bytes,
-    operation,
-  )
+  let decision = match self.state {
+    Closed => Deny(SessionClosed)
+    Active =>
+      self.policy.decide(
+        self.attempts,
+        tool_attempts,
+        self.used_bytes,
+        operation,
+      )
+  }
   let sequence = self.attempts + 1
   self.attempts = sequence
   self.tool_attempts[tool] = tool_attempts + 1

@@ -119,8 +119,16 @@ pub fn ToolQuota::new(
 }
 
 ///|
+/// The lifecycle state of an isolated session.
+pub(all) enum SessionState {
+  Active
+  Closed
+} derive(Debug, Eq)
+
+///|
 /// A machine-readable reason for rejecting an operation.
 pub(all) enum DenyReason {
+  SessionClosed
   CallBudgetExceeded(limit~ : Int)
   ToolCallQuotaExceeded(tool~ : String, limit~ : Int)
   OperationByteLimitExceeded(limit~ : Int, requested~ : Int)
@@ -169,6 +177,7 @@ pub fn Decision::summary(self : Decision) -> String {
 /// Returns a stable, human-readable denial summary.
 pub fn DenyReason::summary(self : DenyReason) -> String {
   match self {
+    SessionClosed => "session is closed"
     CallBudgetExceeded(limit~) => "call budget exceeded (limit \{limit})"
     ToolCallQuotaExceeded(tool~, limit~) =>
       "tool call quota exceeded: \{tool} (limit \{limit})"

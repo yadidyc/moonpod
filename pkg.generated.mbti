@@ -40,6 +40,7 @@ pub fn Decision::is_allowed(Self) -> Bool
 pub fn Decision::summary(Self) -> String
 
 pub(all) enum DenyReason {
+  SessionClosed
   CallBudgetExceeded(limit~ : Int)
   ToolCallQuotaExceeded(tool~ : String, limit~ : Int)
   OperationByteLimitExceeded(limit~ : Int, requested~ : Int)
@@ -85,6 +86,7 @@ pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Ar
 
 pub struct Session {
   policy : Policy
+  mut state : SessionState
   mut attempts : Int
   tool_attempts : Map[String, Int]
   mut used_bytes : Int
@@ -93,10 +95,17 @@ pub struct Session {
 pub fn Session::attempts(Self) -> Int
 pub fn Session::audit_log(Self) -> Array[AuditEvent]
 pub fn Session::authorize(Self, Operation) -> Decision
+pub fn Session::close(Self) -> Unit
 pub fn Session::new(Policy) -> Self
 pub fn Session::remaining_bytes(Self) -> Int
 pub fn Session::remaining_calls(Self) -> Int
+pub fn Session::state(Self) -> SessionState
 pub fn Session::used_bytes(Self) -> Int
+
+pub(all) enum SessionState {
+  Active
+  Closed
+} derive(Eq, @debug.Debug)
 
 pub struct ToolQuota {
   tool : String

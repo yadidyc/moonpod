@@ -7,6 +7,7 @@ pub(all) suberror PolicyConfigError {
   InvalidNetworkPort(Int)
   EmptyCommandProgram
   EmptyToolQuotaName
+  EmptyApprovalToolName
 } derive(Debug, Eq)
 
 ///|
@@ -19,6 +20,7 @@ pub struct Policy {
   network_rules : Array[NetworkRule]
   command_rules : Array[CommandRule]
   tool_quotas : Array[ToolQuota]
+  approval_required_tools : Array[String]
   max_calls : Int
   max_operation_bytes : Int
   max_io_bytes : Int
@@ -40,6 +42,7 @@ pub fn Policy::new(
   max_calls? : Int = 100,
   max_operation_bytes? : Int = 1048576,
   max_io_bytes? : Int = 1048576,
+  approval_required_tools? : Array[String] = [],
 ) -> Policy raise PolicyConfigError {
   if max_calls < 0 {
     raise PolicyConfigError::InvalidLimit(name="max_calls", value=max_calls)
@@ -56,6 +59,11 @@ pub fn Policy::new(
       value=max_operation_bytes,
     )
   }
+  for tool in approval_required_tools {
+    if tool == "" {
+      raise PolicyConfigError::EmptyApprovalToolName
+    }
+  }
   {
     allowed_tools: allowed_tools.copy(),
     read_roots: read_roots.copy(),
@@ -64,6 +72,7 @@ pub fn Policy::new(
     network_rules: network_rules.copy(),
     command_rules: command_rules.copy(),
     tool_quotas: tool_quotas.copy(),
+    approval_required_tools: approval_required_tools.copy(),
     max_calls,
     max_operation_bytes,
     max_io_bytes,
@@ -176,4 +185,9 @@ fn Policy::decide(
   } else {
     Allow
   }
+}
+
+///|
+fn Policy::requires_approval(self : Policy, tool : String) -> Bool {
+  self.approval_required_tools.contains(tool)
 }

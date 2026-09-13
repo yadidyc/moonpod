@@ -129,6 +129,8 @@ pub(all) enum SessionState {
 /// A machine-readable reason for rejecting an operation.
 pub(all) enum DenyReason {
   SessionClosed
+  ApprovalRejected(request_id~ : Int)
+  ApprovalNotPending(request_id~ : Int)
   CallBudgetExceeded(limit~ : Int)
   ToolCallQuotaExceeded(tool~ : String, limit~ : Int)
   OperationByteLimitExceeded(limit~ : Int, requested~ : Int)
@@ -146,11 +148,23 @@ pub(all) enum DenyReason {
 /// The policy decision returned to the host adapter.
 pub(all) enum Decision {
   Allow
+  ApprovalRequired(Int)
+  ApprovalGranted(Int)
+  ApprovalCancelled(Int)
   Deny(DenyReason)
 } derive(Debug, Eq)
 
 ///|
-/// One immutable audit entry produced by a session.
+/// An operation waiting for a human decision.
+pub(all) struct ApprovalRequest {
+  id : Int
+  operation : Operation
+} derive(Debug, Eq)
+
+///|
+/// One audit entry produced by a session.
+///
+/// Pending approval entries are updated with the final decision when resolved.
 pub(all) struct AuditEvent {
   sequence : Int
   operation : Operation
@@ -161,7 +175,7 @@ pub(all) struct AuditEvent {
 ///|
 /// Returns whether this decision permits the host operation.
 pub fn Decision::is_allowed(self : Decision) -> Bool {
-  self is Allow
+  self is Allow || self is ApprovalGranted(_)
 }
 
 ///|
@@ -169,6 +183,9 @@ pub fn Decision::is_allowed(self : Decision) -> Bool {
 pub fn Decision::summary(self : Decision) -> String {
   match self {
     Allow => "allow"
+    ApprovalRequired(request_id) => "approval required: request \{request_id}"
+    ApprovalGranted(request_id) => "approved: request \{request_id}"
+    ApprovalCancelled(request_id) => "approval cancelled: request \{request_id}"
     Deny(reason) => "deny: " + reason.summary()
   }
 }
@@ -178,6 +195,9 @@ pub fn Decision::summary(self : Decision) -> String {
 pub fn DenyReason::summary(self : DenyReason) -> String {
   match self {
     SessionClosed => "session is closed"
+    ApprovalRejected(request_id~) => "approval rejected: request \{request_id}"
+    ApprovalNotPending(request_id~) =>
+      "approval request is not pending: \{request_id}"
     CallBudgetExceeded(limit~) => "call budget exceeded (limit \{limit})"
     ToolCallQuotaExceeded(tool~, limit~) =>
       "tool call quota exceeded: \{tool} (limit \{limit})"

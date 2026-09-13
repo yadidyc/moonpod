@@ -16,9 +16,15 @@ pub(all) suberror PolicyConfigError {
   InvalidNetworkPort(Int)
   EmptyCommandProgram
   EmptyToolQuotaName
+  EmptyApprovalToolName
 } derive(Eq, @debug.Debug)
 
 // Types and methods
+pub(all) struct ApprovalRequest {
+  id : Int
+  operation : Operation
+} derive(Eq, @debug.Debug)
+
 pub(all) struct AuditEvent {
   sequence : Int
   operation : Operation
@@ -34,6 +40,9 @@ pub fn CommandRule::new(program~ : String, argument_prefix~ : Array[String]) -> 
 
 pub(all) enum Decision {
   Allow
+  ApprovalRequired(Int)
+  ApprovalGranted(Int)
+  ApprovalCancelled(Int)
   Deny(DenyReason)
 } derive(Eq, @debug.Debug)
 pub fn Decision::is_allowed(Self) -> Bool
@@ -41,6 +50,8 @@ pub fn Decision::summary(Self) -> String
 
 pub(all) enum DenyReason {
   SessionClosed
+  ApprovalRejected(request_id~ : Int)
+  ApprovalNotPending(request_id~ : Int)
   CallBudgetExceeded(limit~ : Int)
   ToolCallQuotaExceeded(tool~ : String, limit~ : Int)
   OperationByteLimitExceeded(limit~ : Int, requested~ : Int)
@@ -78,11 +89,12 @@ pub struct Policy {
   network_rules : Array[NetworkRule]
   command_rules : Array[CommandRule]
   tool_quotas : Array[ToolQuota]
+  approval_required_tools : Array[String]
   max_calls : Int
   max_operation_bytes : Int
   max_io_bytes : Int
 }
-pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], protected_paths? : Array[String], network_rules? : Array[NetworkRule], command_rules? : Array[CommandRule], tool_quotas? : Array[ToolQuota], max_calls? : Int, max_operation_bytes? : Int, max_io_bytes? : Int) -> Self raise PolicyConfigError
+pub fn Policy::new(Array[String], read_roots? : Array[String], write_roots? : Array[String], protected_paths? : Array[String], network_rules? : Array[NetworkRule], command_rules? : Array[CommandRule], tool_quotas? : Array[ToolQuota], max_calls? : Int, max_operation_bytes? : Int, max_io_bytes? : Int, approval_required_tools? : Array[String]) -> Self raise PolicyConfigError
 
 pub struct Session {
   policy : Policy
@@ -90,13 +102,18 @@ pub struct Session {
   mut attempts : Int
   tool_attempts : Map[String, Int]
   mut used_bytes : Int
+  mut reserved_bytes : Int
   events : Array[AuditEvent]
+  approvals : Array[ApprovalRequest]
 }
+pub fn Session::approve(Self, Int) -> Decision
 pub fn Session::attempts(Self) -> Int
 pub fn Session::audit_log(Self) -> Array[AuditEvent]
 pub fn Session::authorize(Self, Operation) -> Decision
 pub fn Session::close(Self) -> Unit
 pub fn Session::new(Policy) -> Self
+pub fn Session::pending_approvals(Self) -> Array[ApprovalRequest]
+pub fn Session::reject(Self, Int) -> Decision
 pub fn Session::remaining_bytes(Self) -> Int
 pub fn Session::remaining_calls(Self) -> Int
 pub fn Session::state(Self) -> SessionState

@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yadidyc/moonpod/moonpermit_adapter"
+
+import {
+  "doffice/moonpermit",
+  "moonbitlang/core/debug",
+  "yadidyc/moonpod",
+}
+
+// Values
+pub fn policy_from_permit(@moonpermit.Permit, protected_paths? : Array[String], approval_required_tools? : Array[String]) -> @moonpod.Policy raise PermitAdapterError
+
+// Errors
+pub(all) suberror PermitAdapterError {
+  ExactPathUnsupported(grant_id~ : String)
+  RepositoryRootTreeUnsupported(grant_id~ : String)
+  ExactCommandUnsupported(grant_id~ : String)
+  UnsupportedEffect(grant_id~ : String, effect~ : String)
+  ExpiringGrantUnsupported(grant_id~ : String)
+  MultipleGrantsForTool(tool~ : String)
+  ByteLimitOutOfRange(grant_id~ : String, limit~ : Int64)
+  CallLimitOverflow
+  InvalidGeneratedPolicy
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+
+// Type aliases
+
+// Traits

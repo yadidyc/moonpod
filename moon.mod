@@ -24,3 +24,7 @@ keywords = [ "agent", "sandbox", "policy", "security", "audit" ]
 preferred_target = "wasm"
 
 description = "A transport-neutral policy and audit core for isolating AI agent tool calls"
+
+import {
+  "doffice/moonpermit@0.1.1",
+}

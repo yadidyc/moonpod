@@ -1,22 +1,83 @@
 # MoonPod
 
-> MoonBit 智能体隔离舱：在宿主执行工具调用之前，先进行可审计的安全策略判定。
+> MoonBit 通用策略执行与审计引擎：让宿主在执行资源操作前，先得到可解释、可验证的决策。
 
 [![CI](https://github.com/yadidyc/moonpod/actions/workflows/ci.yml/badge.svg)](https://github.com/yadidyc/moonpod/actions/workflows/ci.yml)
 
-MoonPod 是一个纯 MoonBit、无 I/O 副作用的策略核心。它将智能体提出的文件、网络、命令与自定义工具调用转换为 `Allow` / `Deny` 决策，并记录每次尝试。宿主适配器只应在收到 `Allow` 后执行真实操作。
+MoonPod 是一个纯 MoonBit、无 I/O 副作用的策略核心。它不假设调用方一定是
+AI Agent，也不直接启动进程或访问文件系统；宿主把一次待执行操作描述成
+`Operation`，MoonPod 返回 `Allow`、`Deny` 或 `ApprovalRequired`，并保存带顺序号的
+审计事件。这个边界让同一套规则可以放在 IDE 插件、CI 任务、桌面自动化、服务
+连接器或 Agent Runtime 前面。
 
-## 能力
+## 为什么需要通用策略层
 
-- 默认拒绝的工具白名单
-- 防目录穿越的词法路径根隔离
-- 网络主机—端口对和命令参数前缀白名单
-- 每会话调用次数与 I/O 字节预算
-- 防篡改快照式审计日志
-- JSON 策略加载和可导出的 JSON 审计记录
-- 不依赖操作系统 API，适合嵌入不同 Agent Runtime
+把“允许某个工具”写成一个布尔开关通常不够用：文件需要目录范围，命令需要参数
+前缀，网络访问需要主机和端口，插件或业务服务还需要动作与资源范围。MoonPod
+把这些约束放进一次统一的会话判定中，默认拒绝未知能力，并把调用次数、单次与
+会话字节预算、人工审批和策略收窄放在同一个可测试模型里。宿主仍负责操作系统
+权限、容器或 Wasm 隔离，MoonPod 负责“这一次调用是否符合策略”。
 
-## 快速开始
+## 核心模型
+
+- **内置操作：** `ReadFile`、`WriteFile`、`Connect` 和 `RunCommand`，分别提供路径、
+  主机—端口、程序名和逐项参数前缀约束。
+- **通用资源操作：** `ResourceAccess(tool, action, resource, estimated_bytes)`
+  配合 `ResourceRule`，可表达 `plugin.invoke / run / tenant/acme`、业务 API
+  路径或工作流资源，而不必为每种领域增加一个枚举分支。
+- **会话与审计：** `Session::authorize` 是唯一的决策入口；会话关闭会取消未处理
+  的审批，请求、最终决定和消耗字节都可通过 `audit_json()` 导出。
+- **策略组合：** `Policy::restrict` 只计算两份策略的共同权限，规则只能收窄、不能
+  扩权，适合把组织策略与任务策略叠加。
+
+## 一个通用资源规则
+
+资源前缀按 `/` 分段匹配，精确资源或其子资源才能通过：
+
+```mbt nocheck
+let policy = @moonpod.Policy::new(
+  ["plugin.invoke"],
+  resource_rules=[
+    @moonpod.ResourceRule::new(
+      tool="plugin.invoke",
+      action="run",
+      resource_prefix="tenant/acme/reports",
+    ),
+  ],
+)
+let session = @moonpod.Session::new(policy)
+session.authorize(@moonpod.ResourceAccess(
+  tool="plugin.invoke",
+  action="run",
+  resource="tenant/acme/reports/monthly",
+  estimated_bytes=512,
+))
+```
+
+同一接口可以换成 CI 的 `build / workspace/project-a` 或桌面自动化的
+`calendar.read / tenant/acme`，调用方只需负责把自己的资源命名规范传进来。
+
+## JSON 策略与审计导出
+
+命令行通过 `--policy-json` 加载策略，并把演示调用和审计摘要写到标准输出：
+
+```powershell
+moon run cmd/main -- --policy-json '{"allowed_tools":["fs.read"],"read_roots":["/workspace"]}' > audit.json
+```
+
+除 `allowed_tools` 外，还可配置 `read_roots`、`write_roots`、`protected_paths`、
+`network_rules`、`command_rules`、`resource_rules`、`tool_quotas`、审批工具和三类
+预算。无效 JSON 或字段类型错误会在任何操作执行前被拒绝。
+
+## 与 MoonPermit 的生态关系
+
+可选子包 `moonpermit_adapter` 将 [`doffice/moonpermit`](https://github.com/doffice/moonpermit)
+的 Permit 安全地转换为 MoonPod Policy。MoonPermit 负责从结构化计划推导最小
+授权、权限包含和委托证明；MoonPod 负责在宿主边界逐次拦截真实调用。适配器只
+接受不会造成扩权的共同子集，无法无损表达的精确路径、过期授权、网络或 Secret
+权限会失败关闭。MoonPod 不依赖 MoonPermit，也不重复实现其计划编译器。
+
+## 快速开始与边界
 
 ```bash
 moon check
@@ -24,153 +85,23 @@ moon test
 moon run cmd/main
 ```
 
-## JSON 策略与审计导出
-
-命令行支持通过 `--policy-json` 加载 JSON 策略，并将本次演示操作的审计摘要和事件写成 JSON 到标准输出。可用 shell 重定向保存审计结果：
-
-```powershell
-moon run cmd/main -- --policy-json '{"allowed_tools":["fs.read"],"read_roots":["/workspace"]}' > audit.json
-```
-
-策略必须包含 `allowed_tools`。可选字段包括 `read_roots`、`write_roots`、`protected_paths`、`network_rules`、`command_rules`、`tool_quotas`、`approval_required_tools`、`max_calls`、`max_operation_bytes` 和 `max_io_bytes`。规则项格式如下：
-
-```json
-{
-  "allowed_tools": ["fs.read", "net.connect"],
-  "read_roots": ["/workspace"],
-  "protected_paths": ["/workspace/.env"],
-  "network_rules": [
-    {"host": "api.example.com", "allowed_ports": [443]}
-  ],
-  "command_rules": [
-    {"program": "moon", "argument_prefix": ["test"]}
-  ],
-  "tool_quotas": [
-    {"tool": "fs.read", "max_calls": 20}
-  ],
-  "max_calls": 100,
-  "max_operation_bytes": 1048576,
-  "max_io_bytes": 1048576
-}
-```
-
-无效 JSON 或不符合字段类型的策略会被拒绝；此时不会执行演示操作。
-
-## MoonPermit 适配
-
-可选子包 `yadidyc/moonpod/moonpermit_adapter` 将
-[`doffice/moonpermit`](https://github.com/doffice/moonpermit) 的 `Permit`
-转换为宿主可直接执行的 MoonPod `Policy`。适配器只接受不会造成扩权的
-共同子集：文件读写目录树、允许追加参数的命令前缀，以及可收紧到
-MoonPod 全局/工具级限制的调用和字节预算。
-
-当 Permit 含有精确文件、仓库根目录树、精确命令、过期时间、文件删除、
-网络方法、Secret 或同一 MoonPod 工具的多个独立 Grant 时，转换会返回
-`PermitAdapterError`，不会忽略约束。MoonPermit 的逐 Grant 字节预算会保守地
-转换为最严格的会话字节上限，因此结果可能更严格，但不会比原 Permit 更宽。
-
-```mbt nocheck
-///|
-let policy = @moonpermit_adapter.policy_from_permit(
-  permit,
-  protected_paths=["workspace/.git", "workspace/.env"],
-  approval_required_tools=["process.run"],
-)
-
-///|
-let session = @moonpod.Session::new(policy)
-```
-
-```mbt check
-///|
-test "workspace isolation" {
-  let moon_test = @moonpod.CommandRule::new(program="moon", argument_prefix=[
-    "test",
-  ])
-  let policy = @moonpod.Policy::new(
-    ["fs.read", "fs.write", "net.connect", "process.run"],
-    read_roots=["/workspace"],
-    write_roots=["/workspace/out"],
-    network_rules=[
-      @moonpod.NetworkRule::new(host="api.example.com", allowed_ports=[443]),
-    ],
-    command_rules=[moon_test],
-    max_calls=20,
-    max_io_bytes=1048576,
-  )
-  let session = @moonpod.Session::new(policy)
-  assert_true(
-    session
-    .authorize(
-      @moonpod.ReadFile(path="/workspace/input.json", estimated_bytes=1024),
-    )
-    .is_allowed(),
-  )
-  assert_true(
-    session.authorize(@moonpod.WriteFile(path="/etc/hosts", bytes=20))
-    is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
-  )
-  assert_true(
-    session
-    .authorize(@moonpod.Connect(host="api.example.com", port=443))
-    .is_allowed(),
-  )
-  assert_true(
-    session.authorize(@moonpod.Connect(host="api.example.com", port=22))
-    is @moonpod.Deny(@moonpod.PortNotAllowed(..)),
-  )
-  assert_true(
-    session
-    .authorize(
-      @moonpod.RunCommand(
-        program="moon",
-        arguments=["test", "--target", "all"],
-        estimated_output_bytes=4096,
-      ),
-    )
-    .is_allowed(),
-  )
-  assert_true(
-    session.authorize(
-      @moonpod.RunCommand(
-        program="moon",
-        arguments=["publish"],
-        estimated_output_bytes=0,
-      ),
-    )
-    is @moonpod.Deny(@moonpod.CommandArgumentsNotAllowed(_)),
-  )
-}
-```
-
-## 集成契约
-
-1. 将智能体请求映射为 `Operation`。
-2. 调用 `Session::authorize`。
-3. 仅在结果为 `Allow` 时执行宿主操作。
-4. 执行层仍需使用 OS 权限、容器、Wasm policy 或其他强隔离机制；MoonPod 是策略门卫，不是操作系统容器。
-
-## 限制
-
-- 路径检查是词法级的，不解析符号链接；宿主在真实文件系统上执行前必须再做规范化与 symlink 防护。
-- `RunCommand` 对可执行程序名做精确匹配，并对参数数组做逐项前缀匹配；它不会调用 shell 解析命令字符串。
-- 当前未包含进程、容器或网络执行器。
-
-完整的信任边界、攻击面与宿主适配器清单见
+接入宿主时遵循：映射请求 → 调用 `Session::authorize` → 仅对 `Allow` 执行副作用 →
+持久化审计快照。路径检查是词法级的，不解析符号链接；命令不会经过 shell
+解析；当前项目也不充当进程、容器或网络执行器。完整信任边界见
 [`docs/threat-model.md`](docs/threat-model.md)。
 
-## 项目结构
+## 项目结构与许可证
 
 ```text
-model.mbt         操作、决策、拒绝原因与审计事件
-path_policy.mbt   路径归一化和边界判定
-policy.mbt        不可变策略与规则求值
-session.mbt       预算、调用计数和审计状态
-json_policy.mbt   JSON 策略解码和审计导出
-moonpermit_adapter MoonPermit Permit 的失败关闭适配
-cmd/main          可运行演示
+model.mbt            操作、决策、拒绝原因和审计事件
+resource_policy.mbt  通用资源规则
+path_policy.mbt      跨平台路径归一化和边界判定
+policy.mbt           不可变策略与规则求值
+policy_restriction.mbt 策略共同权限计算
+session.mbt          会话、预算、审批和审计状态
+json_policy.mbt      JSON 策略解码和审计导出
+moonpermit_adapter   MoonPermit Permit 的失败关闭适配
+cmd/main             可运行演示
 ```
-
-## License
 
 Apache-2.0

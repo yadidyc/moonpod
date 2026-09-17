@@ -19,11 +19,11 @@ repository = "https://github.com/yadidyc/moonpod"
 
 license = "Apache-2.0"
 
-keywords = [ "agent", "sandbox", "policy", "security", "audit" ]
+keywords = [ "policy", "audit", "plugin", "workflow", "agent" ]
 
 preferred_target = "wasm"
 
-description = "A transport-neutral policy and audit core for isolating AI agent tool calls"
+description = "A transport-neutral resource policy and audit engine for MoonBit hosts"
 
 import {
   "doffice/moonpermit@0.1.1",

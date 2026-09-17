@@ -1,8 +1,9 @@
 ///|
-/// An operation an agent wants the host to perform.
+/// An operation a caller wants the host to perform.
 ///
 /// Byte estimates are charged against the session I/O budget only when the
-/// operation is allowed.
+/// operation is allowed. `ResourceAccess` provides a domain-neutral request
+/// shape for caller-defined tools, actions, and resource namespaces.
 pub(all) enum Operation {
   ReadFile(path~ : String, estimated_bytes~ : Int)
   WriteFile(path~ : String, bytes~ : Int)
@@ -13,6 +14,12 @@ pub(all) enum Operation {
     estimated_output_bytes~ : Int
   )
   Invoke(tool~ : String, estimated_output_bytes~ : Int)
+  ResourceAccess(
+    tool~ : String,
+    action~ : String,
+    resource~ : String,
+    estimated_bytes~ : Int
+  )
 } derive(Debug, Eq)
 
 ///|
@@ -141,6 +148,7 @@ pub(all) enum DenyReason {
   PortNotAllowed(host~ : String, port~ : Int)
   CommandNotAllowed(String)
   CommandArgumentsNotAllowed(String)
+  ResourceNotAllowed(tool~ : String, action~ : String, resource~ : String)
   InvalidByteEstimate(Int)
 } derive(Debug, Eq)
 
@@ -212,6 +220,8 @@ pub fn DenyReason::summary(self : DenyReason) -> String {
     CommandNotAllowed(program) => "command not allowed: \{program}"
     CommandArgumentsNotAllowed(program) =>
       "command arguments not allowed: \{program}"
+    ResourceNotAllowed(tool~, action~, resource~) =>
+      "resource not allowed: \{tool} / \{action} / \{resource}"
     InvalidByteEstimate(value) => "invalid byte estimate: \{value}"
   }
 }
@@ -224,6 +234,7 @@ pub fn Operation::tool_name(self : Operation) -> String {
     Connect(..) => "net.connect"
     RunCommand(..) => "process.run"
     Invoke(tool~, ..) => tool
+    ResourceAccess(tool~, ..) => tool
   }
 }
 
@@ -235,6 +246,7 @@ fn Operation::byte_cost(self : Operation) -> Int {
     Connect(..) => 0
     RunCommand(estimated_output_bytes~, ..) => estimated_output_bytes
     Invoke(estimated_output_bytes~, ..) => estimated_output_bytes
+    ResourceAccess(estimated_bytes~, ..) => estimated_bytes
   }
 }
 

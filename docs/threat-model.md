@@ -5,17 +5,20 @@
 - Files outside the declared read and write roots
 - Network services not present in the host allowlist
 - Program and argument combinations not present in the command rules
+- Resources and actions outside the declared generic resource rules
 - Host availability, bounded through call and byte budgets
 - A complete decision trail for incident review
 
 ## Trust boundaries
 
-The agent and every `Operation` it proposes are untrusted. `Policy` construction
-and the adapter that performs an allowed operation are trusted. `Session` is the
-only mutable decision state and must not be shared between unrelated agent runs.
+The caller and every `Operation` it proposes are untrusted. The caller may be an
+agent, a CI worker, a plugin host, or another automation system. `Policy`
+construction and the adapter that performs an allowed operation are trusted.
+`Session` is the only mutable decision state and must not be shared between
+unrelated runs.
 
 ```text
-untrusted agent -> Operation -> MoonPod Session -> Decision -> trusted adapter
+untrusted caller -> Operation -> MoonPod Session -> Decision -> trusted adapter
                                       |
                                       +----------> AuditEvent[]
 ```
@@ -32,6 +35,8 @@ or enforcing a decision must never become an implicit allow.
 - Host and port pairs use exact allowlist matching.
 - Executable names use exact matching and arguments use element-wise prefix
   matching; an empty prefix permits only a no-argument invocation.
+- Generic `ResourceAccess` operations require an exact tool/action pair and a
+  resource within a declared slash-separated prefix.
 - Denied calls still consume call budget, limiting repeated probing.
 - I/O estimates are checked without integer-addition overflow.
 - Audit logs are returned as defensive array copies.

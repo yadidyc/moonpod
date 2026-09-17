@@ -8,10 +8,13 @@ pub(all) suberror PolicyConfigError {
   EmptyCommandProgram
   EmptyToolQuotaName
   EmptyApprovalToolName
+  EmptyResourceRuleTool
+  EmptyResourceRuleAction
+  EmptyResourceRulePrefix
 } derive(Debug, Eq)
 
 ///|
-/// A deny-by-default policy for agent operations.
+/// A deny-by-default policy for host operations.
 pub struct Policy {
   allowed_tools : Array[String]
   read_roots : Array[String]
@@ -19,6 +22,7 @@ pub struct Policy {
   protected_paths : Array[String]
   network_rules : Array[NetworkRule]
   command_rules : Array[CommandRule]
+  resource_rules : Array[ResourceRule]
   tool_quotas : Array[ToolQuota]
   approval_required_tools : Array[String]
   max_calls : Int
@@ -30,7 +34,8 @@ pub struct Policy {
 /// Builds an immutable policy.
 ///
 /// Recognized built-in tool keys are `fs.read`, `fs.write`, `net.connect`,
-/// and `process.run`. Custom `Invoke` operations use their own tool name.
+/// and `process.run`. Custom `Invoke` operations use their own tool name;
+/// `ResourceAccess` operations are constrained by `resource_rules`.
 pub fn Policy::new(
   allowed_tools : Array[String],
   read_roots? : Array[String] = [],
@@ -43,6 +48,7 @@ pub fn Policy::new(
   max_operation_bytes? : Int = 1048576,
   max_io_bytes? : Int = 1048576,
   approval_required_tools? : Array[String] = [],
+  resource_rules? : Array[ResourceRule] = [],
 ) -> Policy raise PolicyConfigError {
   if max_calls < 0 {
     raise PolicyConfigError::InvalidLimit(name="max_calls", value=max_calls)
@@ -71,6 +77,7 @@ pub fn Policy::new(
     protected_paths: protected_paths.copy(),
     network_rules: network_rules.copy(),
     command_rules: command_rules.copy(),
+    resource_rules: resource_rules.copy(),
     tool_quotas: tool_quotas.copy(),
     approval_required_tools: approval_required_tools.copy(),
     max_calls,
@@ -175,6 +182,19 @@ fn Policy::decide(
         Deny(CommandArgumentsNotAllowed(program))
       } else {
         Deny(CommandNotAllowed(program))
+      }
+    }
+    ResourceAccess(tool~, action~, resource~, ..) => {
+      let mut allowed = false
+      for rule in self.resource_rules {
+        if rule.matches(tool, action, resource) {
+          allowed = true
+        }
+      }
+      if allowed {
+        Allow
+      } else {
+        Deny(ResourceNotAllowed(tool~, action~, resource~))
       }
     }
     Invoke(..) => Allow

@@ -25,6 +25,10 @@ pub fn Policy::restrict(self : Policy, restriction : Policy) -> Policy {
       self.command_rules,
       restriction.command_rules,
     ),
+    resource_rules: intersect_resource_rules(
+      self.resource_rules,
+      restriction.resource_rules,
+    ),
     tool_quotas: intersect_tool_quotas(
       self.tool_quotas,
       restriction.tool_quotas,
@@ -167,6 +171,51 @@ fn intersect_command_rules(
     }
   }
   result
+}
+
+///|
+fn intersect_resource_rules(
+  left : Array[ResourceRule],
+  right : Array[ResourceRule],
+) -> Array[ResourceRule] {
+  let result = []
+  for left_rule in left {
+    for right_rule in right {
+      if left_rule.tool == right_rule.tool &&
+        left_rule.action == right_rule.action {
+        let prefix = if left_rule.resource_prefix == right_rule.resource_prefix {
+          Some(left_rule.resource_prefix)
+        } else if resource_prefix_is_within(
+            left_rule.resource_prefix,
+            right_rule.resource_prefix,
+          ) {
+          Some(left_rule.resource_prefix)
+        } else if resource_prefix_is_within(
+            right_rule.resource_prefix,
+            left_rule.resource_prefix,
+          ) {
+          Some(right_rule.resource_prefix)
+        } else {
+          None
+        }
+        match prefix {
+          Some(resource_prefix) =>
+            result.push({
+              tool: left_rule.tool,
+              action: left_rule.action,
+              resource_prefix,
+            })
+          None => ()
+        }
+      }
+    }
+  }
+  result
+}
+
+///|
+fn resource_prefix_is_within(candidate : String, parent : String) -> Bool {
+  candidate.has_prefix(parent + "/")
 }
 
 ///|

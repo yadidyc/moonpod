@@ -45,6 +45,17 @@ pub fn Policy::from_json(source : String) -> Policy raise PolicyJsonError {
     }
     command_rules.push(rule)
   }
+  let resource_rules = []
+  for value in optional_array(fields, "resource_rules") {
+    let rule_fields = json_object(value)
+    let tool = required_string(rule_fields, "tool")
+    let action = required_string(rule_fields, "action")
+    let resource_prefix = required_string(rule_fields, "resource_prefix")
+    let rule = ResourceRule::new(tool~, action~, resource_prefix~) catch {
+      _ => raise PolicyJsonError::InvalidField("resource_rules")
+    }
+    resource_rules.push(rule)
+  }
   let tool_quotas = []
   for value in optional_array(fields, "tool_quotas") {
     let quota_fields = json_object(value)
@@ -70,6 +81,7 @@ pub fn Policy::from_json(source : String) -> Policy raise PolicyJsonError {
     max_operation_bytes~,
     max_io_bytes~,
     approval_required_tools~,
+    resource_rules~,
   ) catch {
     _ => raise PolicyJsonError::InvalidPolicy
   }
@@ -298,6 +310,17 @@ fn append_operation_json(output : StringBuilder, operation : Operation) -> Unit 
       append_json_string(output, tool)
       output.write_string(", \"estimated_output_bytes\": ")
       output.write_string(estimated_output_bytes.to_string())
+      output.write_char('}')
+    }
+    ResourceAccess(tool~, action~, resource~, estimated_bytes~) => {
+      output.write_string("{\"tool\": ")
+      append_json_string(output, tool)
+      output.write_string(", \"action\": ")
+      append_json_string(output, action)
+      output.write_string(", \"resource\": ")
+      append_json_string(output, resource)
+      output.write_string(", \"estimated_bytes\": ")
+      output.write_string(estimated_bytes.to_string())
       output.write_char('}')
     }
   }

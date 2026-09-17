@@ -85,6 +85,11 @@ moon test
 moon run cmd/main
 ```
 
+演示命令会先运行工作区策略，再运行一个与 Agent 无关的构建产物策略：
+`workspace/project-a/report.json` 被允许读取，而同样的请求换成
+`workspace/project-b/report.json` 会被拒绝。这两个结果来自同一个
+`ResourceRule` 的前缀边界，便于在没有真实执行器的环境中复核策略行为。
+
 接入宿主时遵循：映射请求 → 调用 `Session::authorize` → 仅对 `Allow` 执行副作用 →
 持久化审计快照。路径检查是词法级的，不解析符号链接；命令不会经过 shell
 解析；当前项目也不充当进程、容器或网络执行器。完整信任边界见

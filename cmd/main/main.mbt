@@ -24,6 +24,24 @@ fn run_text_demo() -> Unit {
   println(
     "attempts=\{session.attempts()}, charged_bytes=\{session.used_bytes()}",
   )
+  run_generic_resource_demo()
+}
+
+///|
+fn run_generic_resource_demo() -> Unit {
+  let policy = try! @moonpod.Policy::new(["artifact.read"], resource_rules=[
+    try! @moonpod.ResourceRule::new(
+      tool="artifact.read",
+      action="read",
+      resource_prefix="workspace/project-a",
+    ),
+  ])
+  let session = @moonpod.Session::new(policy)
+  println("Generic resource policy demo")
+  for operation in generic_resource_operations() {
+    let decision = session.authorize(operation)
+    println("- \{operation.tool_name()}: \{decision.summary()}")
+  }
 }
 
 ///|
@@ -51,5 +69,23 @@ fn demo_operations() -> Array[@moonpod.Operation] {
       estimated_output_bytes=4096,
     ),
     @moonpod.Connect(host="example.com", port=443),
+  ]
+}
+
+///|
+fn generic_resource_operations() -> Array[@moonpod.Operation] {
+  [
+    @moonpod.ResourceAccess(
+      tool="artifact.read",
+      action="read",
+      resource="workspace/project-a/report.json",
+      estimated_bytes=512,
+    ),
+    @moonpod.ResourceAccess(
+      tool="artifact.read",
+      action="read",
+      resource="workspace/project-b/report.json",
+      estimated_bytes=512,
+    ),
   ]
 }

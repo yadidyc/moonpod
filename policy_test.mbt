@@ -108,6 +108,84 @@ test "protected paths override allowed workspace roots" {
 }
 
 ///|
+test "Windows drive paths match protected paths without ASCII case sensitivity" {
+  let policy = @moonpod.Policy::new(["fs.read"], read_roots=["C:\\Work"], protected_paths=[
+    "c:\\work\\.git", "C:\\WORK\\.env",
+  ])
+  let session = @moonpod.Session::new(policy)
+  assert_true(
+    session
+    .authorize(
+      @moonpod.ReadFile(path="c:\\WORK\\src\\main.mbt", estimated_bytes=1),
+    )
+    .is_allowed(),
+  )
+  for path in ["C:\\Work\\.GIT\\config", "c:\\work\\.ENV"] {
+    assert_true(
+      session.authorize(@moonpod.ReadFile(path~, estimated_bytes=1))
+      is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+    )
+  }
+  let drive_policy = @moonpod.Policy::new(["fs.read"], read_roots=["C:\\"], protected_paths=[
+    "c:\\Windows\\System32",
+  ])
+  let drive_session = @moonpod.Session::new(drive_policy)
+  assert_true(
+    drive_session
+    .authorize(
+      @moonpod.ReadFile(path="c:\\Users\\public.txt", estimated_bytes=1),
+    )
+    .is_allowed(),
+  )
+  assert_true(
+    drive_session.authorize(
+      @moonpod.ReadFile(path="C:\\WINDOWS\\system32\\config", estimated_bytes=1),
+    )
+    is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+  )
+}
+
+///|
+test "UNC paths match protected paths without ASCII case sensitivity" {
+  let policy = @moonpod.Policy::new(
+    ["fs.read"],
+    read_roots=["\\\\Server\\Share"],
+    protected_paths=["\\\\server\\share\\.env"],
+  )
+  let session = @moonpod.Session::new(policy)
+  assert_true(
+    session.authorize(
+      @moonpod.ReadFile(
+        path="\\\\SERVER\\SHARE\\.ENV\\secrets",
+        estimated_bytes=1,
+      ),
+    )
+    is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+  )
+}
+
+///|
+test "POSIX paths remain case sensitive" {
+  let policy = @moonpod.Policy::new(["fs.read"], read_roots=["/workspace"], protected_paths=[
+    "/workspace/Secret",
+  ])
+  let session = @moonpod.Session::new(policy)
+  assert_true(
+    session
+    .authorize(
+      @moonpod.ReadFile(path="/workspace/secret/file", estimated_bytes=1),
+    )
+    .is_allowed(),
+  )
+  assert_true(
+    session.authorize(
+      @moonpod.ReadFile(path="/Workspace/secret/file", estimated_bytes=1),
+    )
+    is @moonpod.Deny(@moonpod.PathNotAllowed(_)),
+  )
+}
+
+///|
 test "enforces tool allowlist" {
   let policy = @moonpod.Policy::new([])
   let session = @moonpod.Session::new(policy)

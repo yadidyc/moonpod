@@ -1,6 +1,7 @@
 ///|
 /// Normalizes portable lexical paths without touching the host filesystem.
-/// Going above the lexical root is rejected.
+/// Going above the lexical root is rejected. Drive-letter and UNC paths use
+/// ASCII case folding; POSIX and relative paths remain case sensitive.
 fn normalize_path(raw : String) -> String? {
   let path = raw.replace_all(old="\\", new="/")
   guard path != "" else { return None }
@@ -31,7 +32,7 @@ fn normalize_path(raw : String) -> String? {
   if unc && parts.length() < 2 {
     None
   } else if drive_absolute && parts.length() == 1 {
-    Some(parts[0] + "/")
+    Some((parts[0] + "/").to_lower())
   } else if parts.length() == 0 {
     if absolute {
       Some("/")
@@ -40,12 +41,16 @@ fn normalize_path(raw : String) -> String? {
     }
   } else {
     let joined = parts.iter().join("/")
-    if unc {
+    let normalized = if unc {
       Some("//" + joined)
     } else if absolute {
       Some("/" + joined)
     } else {
       Some(joined)
+    }
+    match normalized {
+      Some(value) if drive_absolute || unc => Some(value.to_lower())
+      _ => normalized
     }
   }
 }
@@ -56,6 +61,10 @@ fn path_is_within(path : String, roots : Array[String]) -> Bool {
   for raw_root in roots {
     guard normalize_path(raw_root) is Some(root) else { continue }
     if root == "/" && candidate.has_prefix("/") {
+      return true
+    }
+    let drive_root = root.length() == 3 && root[1] == ':' && root[2] == '/'
+    if drive_root && candidate.has_prefix(root) {
       return true
     }
     if candidate == root || candidate.has_prefix(root + "/") {

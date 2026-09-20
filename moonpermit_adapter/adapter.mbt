@@ -32,7 +32,9 @@ pub(all) suberror PermitAdapterError {
 ///       @moonpermit.budget(max_calls=2, max_bytes=1024),
 ///     ),
 ///   ])
-///   let policy = policy_from_permit(permit, protected_paths=["docs/.env"])
+///   let policy = @moonpermit_adapter.policy_from_permit(permit, protected_paths=[
+///     "docs/.env",
+///   ])
 ///   let session = @moonpod.Session::new(policy)
 ///   assert_true(
 ///     session

@@ -5,19 +5,36 @@ pub(all) suberror PolicyJsonError {
   ExpectedObject
   MissingField(String)
   InvalidField(String)
+  UnsupportedSchemaVersion(Int)
+  UnknownField(String)
   InvalidPolicy
 } derive(Debug, Eq)
 
 ///|
 /// Builds a policy from a JSON document.
 ///
-/// `allowed_tools` is required. Other array fields default to empty and numeric
-/// limits use the same defaults as `Policy::new`.
+/// The document must declare `"schema_version": 1`. Unknown fields are
+/// rejected so a typo cannot silently weaken a policy. `allowed_tools` is
+/// required; other array fields default to empty and numeric limits use the
+/// same defaults as `Policy::new`.
 pub fn Policy::from_json(source : String) -> Policy raise PolicyJsonError {
   let value = @json.parse(source) catch {
     _ => raise PolicyJsonError::InvalidJson
   }
   let fields = json_object(value)
+  ensure_known_fields(
+    fields,
+    [
+      "schema_version", "allowed_tools", "read_roots", "write_roots", "protected_paths",
+      "network_rules", "command_rules", "resource_rules", "tool_quotas", "max_calls",
+      "max_operation_bytes", "max_io_bytes", "approval_required_tools",
+    ],
+    "",
+  )
+  let schema_version = required_int(fields, "schema_version")
+  if schema_version != 1 {
+    raise PolicyJsonError::UnsupportedSchemaVersion(schema_version)
+  }
   let allowed_tools = required_string_array(fields, "allowed_tools")
   let read_roots = optional_string_array(fields, "read_roots")
   let write_roots = optional_string_array(fields, "write_roots")
@@ -28,6 +45,7 @@ pub fn Policy::from_json(source : String) -> Policy raise PolicyJsonError {
   let network_rules = []
   for value in optional_array(fields, "network_rules") {
     let rule_fields = json_object(value)
+    ensure_known_fields(rule_fields, ["host", "allowed_ports"], "network_rules")
     let host = required_string(rule_fields, "host")
     let allowed_ports = required_int_array(rule_fields, "allowed_ports")
     let rule = NetworkRule::new(host~, allowed_ports~) catch {
@@ -38,6 +56,11 @@ pub fn Policy::from_json(source : String) -> Policy raise PolicyJsonError {
   let command_rules = []
   for value in optional_array(fields, "command_rules") {
     let rule_fields = json_object(value)
+    ensure_known_fields(
+      rule_fields,
+      ["program", "argument_prefix"],
+      "command_rules",
+    )
     let program = required_string(rule_fields, "program")
     let argument_prefix = required_string_array(rule_fields, "argument_prefix")
     let rule = CommandRule::new(program~, argument_prefix~) catch {
@@ -48,6 +71,11 @@ pub fn Policy::from_json(source : String) -> Policy raise PolicyJsonError {
   let resource_rules = []
   for value in optional_array(fields, "resource_rules") {
     let rule_fields = json_object(value)
+    ensure_known_fields(
+      rule_fields,
+      ["tool", "action", "resource_prefix"],
+      "resource_rules",
+    )
     let tool = required_string(rule_fields, "tool")
     let action = required_string(rule_fields, "action")
     let resource_prefix = required_string(rule_fields, "resource_prefix")
@@ -59,6 +87,7 @@ pub fn Policy::from_json(source : String) -> Policy raise PolicyJsonError {
   let tool_quotas = []
   for value in optional_array(fields, "tool_quotas") {
     let quota_fields = json_object(value)
+    ensure_known_fields(quota_fields, ["tool", "max_calls"], "tool_quotas")
     let tool = required_string(quota_fields, "tool")
     let max_calls = required_int(quota_fields, "max_calls")
     let quota = ToolQuota::new(tool~, max_calls~) catch {
@@ -84,6 +113,20 @@ pub fn Policy::from_json(source : String) -> Policy raise PolicyJsonError {
     resource_rules~,
   ) catch {
     _ => raise PolicyJsonError::InvalidPolicy
+  }
+}
+
+///|
+fn ensure_known_fields(
+  fields : Map[String, Json],
+  known : Array[String],
+  context : String,
+) -> Unit raise PolicyJsonError {
+  for name, _ in fields {
+    if !known.contains(name) {
+      let full_name = if context == "" { name } else { context + "." + name }
+      raise PolicyJsonError::UnknownField(full_name)
+    }
   }
 }
 

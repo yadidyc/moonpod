@@ -54,6 +54,7 @@ test "generic resource rules survive JSON loading and restriction" {
   let policy = @moonpod.Policy::from_json(
     (
       #|{
+      #|  "schema_version": 1,
       #|  "allowed_tools": ["plugin.invoke"],
       #|  "resource_rules": [
       #|    {

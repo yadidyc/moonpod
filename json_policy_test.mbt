@@ -2,7 +2,7 @@
 test "loads JSON policy rules for paths and network ports" {
   let policy = try
     @moonpod.Policy::from_json(
-      "{\"allowed_tools\":[\"fs.read\",\"net.connect\"],\"read_roots\":[\"/workspace\"],\"protected_paths\":[\"/workspace/.env\"],\"network_rules\":[{\"host\":\"api.example.com\",\"allowed_ports\":[443]}],\"max_calls\":8,\"max_operation_bytes\":4096,\"max_io_bytes\":2048}",
+      "{\"schema_version\":1,\"allowed_tools\":[\"fs.read\",\"net.connect\"],\"read_roots\":[\"/workspace\"],\"protected_paths\":[\"/workspace/.env\"],\"network_rules\":[{\"host\":\"api.example.com\",\"allowed_ports\":[443]}],\"max_calls\":8,\"max_operation_bytes\":4096,\"max_io_bytes\":2048}",
     )
   catch {
     @moonpod.PolicyJsonError::InvalidField(name) =>
@@ -12,6 +12,10 @@ test "loads JSON policy rules for paths and network ports" {
     @moonpod.PolicyJsonError::InvalidPolicy => fail("policy validation failed")
     @moonpod.PolicyJsonError::ExpectedObject => fail("expected JSON object")
     @moonpod.PolicyJsonError::InvalidJson => fail("invalid JSON syntax")
+    @moonpod.PolicyJsonError::UnsupportedSchemaVersion(_) =>
+      fail("unexpected schema version")
+    @moonpod.PolicyJsonError::UnknownField(name) =>
+      fail("unexpected unknown field: " + name)
   } noraise {
     policy => policy
   }
@@ -50,7 +54,7 @@ test "rejects malformed JSON policies and required fields" {
   }
   try @moonpod.Policy::from_json("{}") catch {
     @moonpod.PolicyJsonError::MissingField(name) =>
-      assert_eq(name, "allowed_tools")
+      assert_eq(name, "schema_version")
     _ => fail("missing allowlist should be reported")
   } noraise {
     _ => fail("missing allowlist should fail")
@@ -61,7 +65,7 @@ test "rejects malformed JSON policies and required fields" {
 test "loads command prefixes, tool quotas, and approval requirements" {
   let command_policy = try
     @moonpod.Policy::from_json(
-      "{\"allowed_tools\":[\"process.run\"],\"command_rules\":[{\"program\":\"moon\",\"argument_prefix\":[\"test\"]}],\"approval_required_tools\":[\"process.run\"]}",
+      "{\"schema_version\":1,\"allowed_tools\":[\"process.run\"],\"command_rules\":[{\"program\":\"moon\",\"argument_prefix\":[\"test\"]}],\"approval_required_tools\":[\"process.run\"]}",
     )
   catch {
     _ => fail("command policy JSON should load")
@@ -92,7 +96,7 @@ test "loads command prefixes, tool quotas, and approval requirements" {
 
   let quota_policy = try
     @moonpod.Policy::from_json(
-      "{\"allowed_tools\":[\"fs.read\"],\"read_roots\":[\"/workspace\"],\"tool_quotas\":[{\"tool\":\"fs.read\",\"max_calls\":1}]}",
+      "{\"schema_version\":1,\"allowed_tools\":[\"fs.read\"],\"read_roots\":[\"/workspace\"],\"tool_quotas\":[{\"tool\":\"fs.read\",\"max_calls\":1}]}",
     )
   catch {
     _ => fail("quota policy JSON should load")
@@ -111,6 +115,40 @@ test "loads command prefixes, tool quotas, and approval requirements" {
     )
     is @moonpod.Deny(@moonpod.ToolCallQuotaExceeded(tool="fs.read", limit=1)),
   )
+}
+
+///|
+test "enforces the versioned JSON schema" {
+  try
+    @moonpod.Policy::from_json("{\"schema_version\":2,\"allowed_tools\":[]}")
+  catch {
+    @moonpod.PolicyJsonError::UnsupportedSchemaVersion(version) =>
+      assert_eq(version, 2)
+    _ => fail("unsupported schema version should be rejected")
+  } noraise {
+    _ => fail("unsupported schema version should fail")
+  }
+  try
+    @moonpod.Policy::from_json(
+      "{\"schema_version\":1,\"allowed_tools\":[],\"typo\":true}",
+    )
+  catch {
+    @moonpod.PolicyJsonError::UnknownField(name) => assert_eq(name, "typo")
+    _ => fail("unknown schema fields should be rejected")
+  } noraise {
+    _ => fail("unknown schema fields should fail")
+  }
+  try
+    @moonpod.Policy::from_json(
+      "{\"schema_version\":1,\"allowed_tools\":[],\"network_rules\":[{\"host\":\"api.example.com\",\"allowed_ports\":[443],\"typo\":true}]}",
+    )
+  catch {
+    @moonpod.PolicyJsonError::UnknownField(name) =>
+      assert_eq(name, "network_rules.typo")
+    _ => fail("unknown nested fields should be rejected")
+  } noraise {
+    _ => fail("unknown nested fields should fail")
+  }
 }
 
 ///|

@@ -62,10 +62,11 @@ session.authorize(@moonpod.ResourceAccess(
 命令行通过 `--policy-json` 加载策略，并把演示调用和审计摘要写到标准输出：
 
 ```powershell
-moon run cmd/main -- --policy-json '{"allowed_tools":["fs.read"],"read_roots":["/workspace"]}' > audit.json
+moon run cmd/main -- --policy-json '{"schema_version":1,"allowed_tools":["fs.read"],"read_roots":["/workspace"]}' > audit.json
 ```
 
-除 `allowed_tools` 外，还可配置 `read_roots`、`write_roots`、`protected_paths`、
+JSON 策略当前使用严格的 `schema_version: 1` 格式；缺少版本号、版本不支持或出现
+未知字段都会在任何操作执行前被拒绝。除 `allowed_tools` 外，还可配置 `read_roots`、`write_roots`、`protected_paths`、
 `network_rules`、`command_rules`、`resource_rules`、`tool_quotas`、审批工具和三类
 预算。无效 JSON 或字段类型错误会在任何操作执行前被拒绝。
 

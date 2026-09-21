@@ -30,6 +30,8 @@ pub(all) suberror PolicyJsonError {
   ExpectedObject
   MissingField(String)
   InvalidField(String)
+  UnsupportedSchemaVersion(Int)
+  UnknownField(String)
   InvalidPolicy
 } derive(Eq, @debug.Debug)
 pub fn PolicyJsonError::equal(Self, Self) -> Bool

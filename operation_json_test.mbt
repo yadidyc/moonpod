@@ -56,3 +56,24 @@ test "operation JSON codecs reject malformed and unknown fields" {
     _ => fail("unknown operation fields should fail")
   }
 }
+
+///|
+test "operation JSON codecs decode ordered batches" {
+  let operations = @moonpod.Operation::from_json_array(
+    "[{\"tool\":\"net.connect\",\"host\":\"api.example.com\",\"port\":443},{\"tool\":\"calendar.read\",\"estimated_output_bytes\":2}]",
+  )
+  assert_eq(operations.length(), 2)
+  assert_true(
+    operations[0] is @moonpod.Connect(host="api.example.com", port=443),
+  )
+  assert_true(
+    operations[1]
+    is @moonpod.Invoke(tool="calendar.read", estimated_output_bytes=2),
+  )
+  try @moonpod.Operation::from_json_array("{}") catch {
+    @moonpod.OperationJsonError::ExpectedArray => ()
+    _ => fail("a batch must be a JSON array")
+  } noraise {
+    _ => fail("an object should not decode as a batch")
+  }
+}

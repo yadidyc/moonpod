@@ -3,6 +3,7 @@
 pub(all) suberror OperationJsonError {
   InvalidJson
   ExpectedObject
+  ExpectedArray
   MissingField(String)
   InvalidField(String)
   UnknownField(String)
@@ -28,6 +29,33 @@ pub fn Operation::from_json(
   let value = @json.parse(source) catch {
     _ => raise OperationJsonError::InvalidJson
   }
+  operation_from_json_value(value)
+}
+
+///|
+/// Decodes a JSON array of operations in input order.
+pub fn Operation::from_json_array(
+  source : String,
+) -> Array[Operation] raise OperationJsonError {
+  let value = @json.parse(source) catch {
+    _ => raise OperationJsonError::InvalidJson
+  }
+  match value {
+    Json::Array(values) => {
+      let operations = []
+      for value in values {
+        operations.push(operation_from_json_value(value))
+      }
+      operations
+    }
+    _ => raise OperationJsonError::ExpectedArray
+  }
+}
+
+///|
+fn operation_from_json_value(
+  value : Json,
+) -> Operation raise OperationJsonError {
   let fields = operation_json_object(value)
   let tool = operation_required_string(fields, "tool")
   match tool {

@@ -73,6 +73,12 @@ JSON 策略当前使用严格的 `schema_version: 1` 格式；缺少版本号、
 单个操作也可以使用 `Operation::to_json` 和 `Operation::from_json` 在宿主边界传输；
 编解码覆盖文件、网络、命令、通用调用和资源访问，并拒绝缺字段或未知字段。
 
+命令行也可以按顺序评估一批操作；输出中的 `events` 会保留每次调用的决定和消耗：
+
+```powershell
+moon run cmd/main -- --policy-json '{"schema_version":1,"allowed_tools":["fs.read","net.connect"],"read_roots":["/workspace"],"network_rules":[{"host":"api.example.com","allowed_ports":[443]}]}' --operations-json '[{"tool":"fs.read","path":"/workspace/README.md","estimated_bytes":128},{"tool":"net.connect","host":"api.example.com","port":443}]' > batch-audit.json
+```
+
 ## 与 MoonPermit 的生态关系
 
 可选子包 `moonpermit_adapter` 将 [`doffice/moonpermit`](https://github.com/doffice/moonpermit)

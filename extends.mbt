@@ -5,6 +5,12 @@ pub extend PolicyJsonError with @debug.Debug::{to_repr}
 pub extend PolicyJsonError with Eq::{not_equal, equal}
 
 ///|
+pub extend OperationJsonError with @debug.Debug::{to_repr}
+
+///|
+pub extend OperationJsonError with Eq::{not_equal, equal}
+
+///|
 pub extend Operation with @debug.Debug::{to_repr}
 
 ///|

@@ -299,7 +299,7 @@ fn append_audit_event_json(output : StringBuilder, event : AuditEvent) -> Unit {
   output.write_string("{\"sequence\": ")
   output.write_string(event.sequence.to_string())
   output.write_string(", \"operation\": ")
-  append_operation_json(output, event.operation)
+  output.write_string(event.operation.to_json())
   output.write_string(", \"decision\": ")
   append_json_string(output, event.decision.summary())
   output.write_string(", \"charged_bytes\": ")

@@ -295,6 +295,29 @@ pub fn Session::audit_json(self : Session) -> String {
 }
 
 ///|
+/// Serializes one audit event as a standalone JSON record.
+pub fn AuditEvent::to_json(self : AuditEvent) -> String {
+  let output = StringBuilder()
+  append_audit_event_json(output, self)
+  output.to_string()
+}
+
+///|
+/// Exports the audit log as newline-delimited JSON records.
+///
+/// Records retain their sequence order and are suitable for append-only log
+/// sinks. An empty session returns an empty string; non-empty output ends each
+/// record with a newline.
+pub fn Session::audit_jsonl(self : Session) -> String {
+  let output = StringBuilder()
+  for event in self.audit_log() {
+    output.write_string(event.to_json())
+    output.write_char('\n')
+  }
+  output.to_string()
+}
+
+///|
 fn append_audit_event_json(output : StringBuilder, event : AuditEvent) -> Unit {
   output.write_string("{\"sequence\": ")
   output.write_string(event.sequence.to_string())

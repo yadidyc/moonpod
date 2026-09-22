@@ -67,6 +67,7 @@ pub(all) struct AuditEvent {
 } derive(Eq, @debug.Debug)
 pub fn AuditEvent::equal(Self, Self) -> Bool
 pub fn AuditEvent::not_equal(Self, Self) -> Bool
+pub fn AuditEvent::to_json(Self) -> String
 pub fn AuditEvent::to_repr(Self) -> @debug.Repr
 
 pub struct CommandRule {
@@ -179,6 +180,7 @@ pub struct Session {
 pub fn Session::approve(Self, Int) -> Decision
 pub fn Session::attempts(Self) -> Int
 pub fn Session::audit_json(Self) -> String
+pub fn Session::audit_jsonl(Self) -> String
 pub fn Session::audit_log(Self) -> Array[AuditEvent]
 pub fn Session::authorize(Self, Operation) -> Decision
 pub fn Session::close(Self) -> Unit

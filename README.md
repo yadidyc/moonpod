@@ -79,6 +79,13 @@ JSON 策略当前使用严格的 `schema_version: 1` 格式；缺少版本号、
 moon run cmd/main -- --policy-json '{"schema_version":1,"allowed_tools":["fs.read","net.connect"],"read_roots":["/workspace"],"network_rules":[{"host":"api.example.com","allowed_ports":[443]}]}' --operations-json '[{"tool":"fs.read","path":"/workspace/README.md","estimated_bytes":128},{"tool":"net.connect","host":"api.example.com","port":443}]' > batch-audit.json
 ```
 
+追加式日志可加上 `--audit-jsonl`，让每条审计事件独占一行，便于直接写入
+日志收集器或追加到现有文件：
+
+```powershell
+moon run cmd/main -- --policy-json '{"schema_version":1,"allowed_tools":["fs.read"],"read_roots":["/workspace"]}' --operations-json '[{"tool":"fs.read","path":"/workspace/README.md","estimated_bytes":128}]' --audit-jsonl >> audit.jsonl
+```
+
 ## 与 MoonPermit 的生态关系
 
 可选子包 `moonpermit_adapter` 将 [`doffice/moonpermit`](https://github.com/doffice/moonpermit)

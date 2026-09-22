@@ -10,11 +10,21 @@ fn main {
   } else if args.length() == 4 &&
     args[0] == "--policy-json" &&
     args[2] == "--operations-json" {
-    run_json_batch(args[1], args[3])
+    run_json_batch(args[1], args[3], false)
+  } else if args.length() == 5 &&
+    args[0] == "--policy-json" &&
+    args[2] == "--operations-json" &&
+    args[4] == "--audit-jsonl" {
+    run_json_batch(args[1], args[3], true)
   } else if args.length() == 5 &&
     args[1] == "--policy-json" &&
     args[3] == "--operations-json" {
-    run_json_batch(args[2], args[4])
+    run_json_batch(args[2], args[4], false)
+  } else if args.length() == 6 &&
+    args[1] == "--policy-json" &&
+    args[3] == "--operations-json" &&
+    args[5] == "--audit-jsonl" {
+    run_json_batch(args[2], args[4], true)
   } else {
     println(
       "Usage: moon run cmd/main [-- --policy-json <json-policy> " +
@@ -70,7 +80,11 @@ fn run_json_policy(source : String) -> Unit {
 }
 
 ///|
-fn run_json_batch(policy_source : String, operations_source : String) -> Unit {
+fn run_json_batch(
+  policy_source : String,
+  operations_source : String,
+  jsonl : Bool,
+) -> Unit {
   try {
     let policy = @moonpod.Policy::from_json(policy_source)
     let operations = @moonpod.Operation::from_json_array(operations_source)
@@ -78,7 +92,11 @@ fn run_json_batch(policy_source : String, operations_source : String) -> Unit {
     for operation in operations {
       ignore(session.authorize(operation))
     }
-    println(session.audit_json())
+    if jsonl {
+      println(session.audit_jsonl())
+    } else {
+      println(session.audit_json())
+    }
   } catch {
     _ => println("Invalid policy or operations JSON")
   }

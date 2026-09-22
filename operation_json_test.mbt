@@ -77,3 +77,27 @@ test "operation JSON codecs decode ordered batches" {
     _ => fail("an object should not decode as a batch")
   }
 }
+
+///|
+test "audit JSONL exports one structured record per line" {
+  let session = @moonpod.Session::new(@moonpod.Policy::new(["fs.read"]))
+  ignore(
+    session.authorize(@moonpod.ReadFile(path="/workspace/a", estimated_bytes=2)),
+  )
+  ignore(
+    session.authorize(@moonpod.ReadFile(path="/workspace/b", estimated_bytes=3)),
+  )
+  let mut count = 0
+  for line in session.audit_jsonl().split("\n") {
+    let text = line.to_owned()
+    if text != "" {
+      try ignore(@json.parse(text)) catch {
+        _ => fail("each JSONL record should be valid JSON")
+      } noraise {
+        _ => ()
+      }
+      count += 1
+    }
+  }
+  assert_eq(count, 2)
+}

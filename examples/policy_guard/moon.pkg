@@ -1,0 +1,5 @@
+import {
+  "yadidyc/moonpod",
+}
+
+pkgtype(kind: "executable")

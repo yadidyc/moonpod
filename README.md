@@ -112,6 +112,19 @@ moon run cmd/main
 解析；当前项目也不充当进程、容器或网络执行器。完整信任边界见
 [`docs/threat-model.md`](docs/threat-model.md)。
 
+## 可运行集成示例
+
+仓库提供两个不执行真实副作用的宿主集成示例：
+
+```bash
+moon run examples/policy_guard
+moon run examples/batch_audit
+```
+
+前者演示把宿主请求映射为 `Operation` 并在 `Decision::is_allowed()` 后才执行动作；
+后者演示加载版本化 JSON 策略、评估操作批次并输出 JSONL 审计记录。详细说明见
+[`examples/README.md`](examples/README.md)。
+
 ## 项目结构与许可证
 
 ```text

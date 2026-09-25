@@ -26,3 +26,7 @@ jobs:
         run: moon test --target all
       - name: Build demo
         run: moon build --target all cmd/main
+      - name: Build integration examples
+        run: |
+          moon build --target all examples/policy_guard
+          moon build --target all examples/batch_audit

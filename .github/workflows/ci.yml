@@ -20,13 +20,21 @@ jobs:
         run: moon update
       - name: Check formatting
         run: moon fmt --check
+      - name: Verify generated interfaces
+        run: |
+          moon info
+          git diff --exit-code -- '**/pkg.generated.mbti'
       - name: Check all stable targets
         run: moon check --target all --deny-warn
-      - name: Test
-        run: moon test --target all
+      - name: Strict tests
+        run: moon test --target all --deny-warn
       - name: Build demo
         run: moon build --target all cmd/main
       - name: Build integration examples
         run: |
           moon build --target all examples/policy_guard
           moon build --target all examples/batch_audit
+      - name: Run integration examples
+        run: |
+          moon run examples/policy_guard
+          moon run examples/batch_audit

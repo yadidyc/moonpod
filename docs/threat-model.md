@@ -61,3 +61,10 @@ MoonPod complements those mechanisms; it does not replace them.
 6. Pass arguments directly without shell interpolation and run child processes
    in an OS sandbox.
 7. Persist the returned audit snapshot outside the agent's writable roots.
+
+## Related guides
+
+- [`integration-guide.md`](integration-guide.md) — host-side wiring, lifecycle,
+  JSON batches, and audit export.
+- [`security-guide.md`](security-guide.md) — adapter responsibilities,
+  policy-authoring checklist, and verification scenarios.

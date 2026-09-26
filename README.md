@@ -110,7 +110,9 @@ moon run cmd/main
 接入宿主时遵循：映射请求 → 调用 `Session::authorize` → 仅对 `Allow` 执行副作用 →
 持久化审计快照。路径检查是词法级的，不解析符号链接；命令不会经过 shell
 解析；当前项目也不充当进程、容器或网络执行器。完整信任边界见
-[`docs/threat-model.md`](docs/threat-model.md)。
+[`docs/threat-model.md`](docs/threat-model.md)；接入步骤见
+[`docs/integration-guide.md`](docs/integration-guide.md)，安全配置和检查清单见
+[`docs/security-guide.md`](docs/security-guide.md)。
 
 ## 可运行集成示例
 
@@ -135,6 +137,8 @@ policy.mbt           不可变策略与规则求值
 policy_restriction.mbt 策略共同权限计算
 session.mbt          会话、预算、审批和审计状态
 json_policy.mbt      JSON 策略解码和审计导出
+docs/integration-guide.md  宿主接入和 API 使用指南
+docs/security-guide.md     安全配置、边界和验证清单
 moonpermit_adapter   MoonPermit Permit 的失败关闭适配
 cmd/main             可运行演示
 ```
